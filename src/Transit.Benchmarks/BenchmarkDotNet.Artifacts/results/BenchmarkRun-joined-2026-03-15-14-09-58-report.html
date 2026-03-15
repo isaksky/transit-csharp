@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>BenchmarkRun-joined-2026-03-15-14-09-58</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.4 (24G517) [Darwin 24.6.0]
+Apple M3 Ultra, 1 CPU, 28 logical and 28 physical cores
+.NET SDK 10.0.103
+  [Host]     : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Type     </th><th>Method               </th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>CacheBenchmarks</td><td>OldTransit_WriteCache</td><td>584,939.6 ns</td><td>5,226.26 ns</td><td>4,888.65 ns</td><td>1.000</td><td>160.1563</td><td>73.2422</td><td>-</td><td>1312.52 KB</td><td>1.000</td>
+</tr><tr><td>ReadBenchmarks</td><td>OldTransit_ReadJson</td><td>1,857.9 ns</td><td>10.65 ns</td><td>9.96 ns</td><td>0.003</td><td>2.9316</td><td>0.2251</td><td>-</td><td>23.99 KB</td><td>0.018</td>
+</tr><tr><td>WriteBenchmarks</td><td>OldTransit_WriteJson</td><td>2,815.0 ns</td><td>8.27 ns</td><td>7.73 ns</td><td>0.005</td><td>1.0071</td><td>0.0076</td><td>-</td><td>8.24 KB</td><td>0.006</td>
+</tr><tr><td>CacheBenchmarks</td><td>NewTransit_WriteCache</td><td>422,949.9 ns</td><td>1,212.85 ns</td><td>1,134.50 ns</td><td>0.723</td><td>122.5586</td><td>52.2461</td><td>-</td><td>1004.36 KB</td><td>0.765</td>
+</tr><tr><td>ReadBenchmarks</td><td>NewTransit_ReadJson</td><td>619.1 ns</td><td>5.29 ns</td><td>4.95 ns</td><td>0.001</td><td>1.9646</td><td>0.1087</td><td>-</td><td>16.09 KB</td><td>0.012</td>
+</tr><tr><td>WriteBenchmarks</td><td>NewTransit_WriteJson</td><td>2,033.1 ns</td><td>6.75 ns</td><td>5.98 ns</td><td>0.003</td><td>8.1940</td><td>1.6365</td><td>-</td><td>67.17 KB</td><td>0.051</td>
+</tr><tr><td>CacheBenchmarks</td><td>OldTransit_ReadCache</td><td>479,137.9 ns</td><td>683.38 ns</td><td>570.65 ns</td><td>0.818</td><td>151.8555</td><td>62.5000</td><td>-</td><td>1240.52 KB</td><td>0.945</td>
+</tr><tr><td>ReadBenchmarks</td><td>OldTransit_ReadJsonVerbose</td><td>1,863.5 ns</td><td>7.71 ns</td><td>7.21 ns</td><td>0.003</td><td>2.9316</td><td>0.2251</td><td>-</td><td>23.99 KB</td><td>0.018</td>
+</tr><tr><td>WriteBenchmarks</td><td>OldTransit_WriteJsonVerbose</td><td>4,386.5 ns</td><td>18.25 ns</td><td>17.07 ns</td><td>0.007</td><td>1.1749</td><td>0.0229</td><td>-</td><td>9.64 KB</td><td>0.007</td>
+</tr><tr><td>CacheBenchmarks</td><td>NewTransit_ReadCache</td><td>304,960.3 ns</td><td>1,234.86 ns</td><td>1,094.67 ns</td><td>0.521</td><td>83.0078</td><td>41.5039</td><td>41.5039</td><td>669.4 KB</td><td>0.510</td>
+</tr><tr><td>ReadBenchmarks</td><td>NewTransit_ReadJsonVerbose</td><td>618.3 ns</td><td>4.98 ns</td><td>4.41 ns</td><td>0.001</td><td>1.9646</td><td>0.1087</td><td>-</td><td>16.09 KB</td><td>0.012</td>
+</tr><tr><td>WriteBenchmarks</td><td>NewTransit_WriteJsonVerbose</td><td>1,766.5 ns</td><td>3.73 ns</td><td>3.49 ns</td><td>0.003</td><td>0.8240</td><td>0.0172</td><td>-</td><td>6.74 KB</td><td>0.005</td>
+</tr></tbody></table>
+</body>
+</html>

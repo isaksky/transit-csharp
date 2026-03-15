@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Transit C# Benchmark Results — Full Run</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #c9d1d9; padding: 2rem; }
+  h1 { color: #58a6ff; margin-bottom: 0.25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: 0.9rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  th, td { padding: 10px 16px; text-align: right; border-bottom: 1px solid #21262d; }
+  th { background: #161b22; color: #58a6ff; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:hover td { background: #161b22; }
+  .old { color: #f0883e; }
+  .new { color: #3fb950; }
+  .faster { color: #3fb950; font-weight: 700; }
+  .slower { color: #f85149; font-weight: 700; }
+  .header-group { text-align: center !important; }
+  .op-cell { font-weight: 600; color: #e6edf3; }
+  .separator { border-left: 2px solid #30363d; }
+  .verdict { border-left: 2px solid #30363d; text-align: center !important; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Transit C# — Old vs New Benchmark Comparison (Full Run)</h1>
+<p class="subtitle">Apple M3 Ultra · .NET 10.0.3 · BenchmarkDotNet v0.13.12 · DefaultJob · 4m00s total · 12 benchmarks</p>
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Operation</th>
+      <th colspan="2" class="header-group old" style="color:#f0883e; border-bottom:2px solid #f0883e;">Old (src_old)</th>
+      <th colspan="2" class="header-group separator new" style="color:#3fb950; border-bottom:2px solid #3fb950;">New (src)</th>
+      <th rowspan="2" class="verdict" style="color:#58a6ff;">Speedup</th>
+    </tr>
+    <tr>
+      <th class="old">Mean</th>
+      <th class="old">Allocated</th>
+      <th class="separator new">Mean</th>
+      <th class="new">Allocated</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="op-cell">Read JSON</td>
+      <td class="old">1,808.5 ns</td>
+      <td class="old">23.99 KB</td>
+      <td class="separator new">619.1 ns</td>
+      <td class="new">16.09 KB</td>
+      <td class="verdict faster">2.9× faster, 33% less alloc</td>
+    </tr>
+    <tr>
+      <td class="op-cell">Read JSON Verbose</td>
+      <td class="old">1,863.5 ns</td>
+      <td class="old">23.99 KB</td>
+      <td class="separator new">618.3 ns</td>
+      <td class="new">16.09 KB</td>
+      <td class="verdict faster">3.0× faster, 33% less alloc</td>
+    </tr>
+    <tr>
+      <td class="op-cell">Write JSON</td>
+      <td class="old">2,871.3 ns</td>
+      <td class="old">8.24 KB</td>
+      <td class="separator new">2,033.1 ns</td>
+      <td class="new">67.17 KB</td>
+      <td class="verdict faster">1.4× faster, but 8× more alloc</td>
+    </tr>
+    <tr>
+      <td class="op-cell">Write JSON Verbose</td>
+      <td class="old">4,386.5 ns</td>
+      <td class="old">9.64 KB</td>
+      <td class="separator new">1,766.5 ns</td>
+      <td class="new">6.74 KB</td>
+      <td class="verdict faster">2.5× faster, 30% less alloc</td>
+    </tr>
+    <tr>
+      <td class="op-cell">Cache Write (1000 maps)</td>
+      <td class="old">585,504 ns</td>
+      <td class="old">1,312.46 KB</td>
+      <td class="separator new">422,950 ns</td>
+      <td class="new">1,004.36 KB</td>
+      <td class="verdict faster">1.4× faster, 23% less alloc</td>
+    </tr>
+    <tr>
+      <td class="op-cell">Cache Read (1000 maps)</td>
+      <td class="old">479,138 ns</td>
+      <td class="old">1,240.52 KB</td>
+      <td class="separator new">304,960 ns</td>
+      <td class="new">669.40 KB</td>
+      <td class="verdict faster">1.6× faster, 46% less alloc</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>
