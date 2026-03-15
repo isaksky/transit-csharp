@@ -450,6 +450,19 @@ public class TransitTest
     }
 
     [TestMethod]
+    public void TestWriteIntegerAtJsonBoundaries()
+    {
+        // 2^53 - 1 is the max safe JSON integer — should be written as a bare number
+        Assert.AreEqual(ScalarVerbose("9007199254740991"), WriteJsonVerbose((long)Math.Pow(2, 53) - 1));
+        // 2^53 exceeds safe range — should be written as ~i string
+        Assert.AreEqual(ScalarVerbose("\"~i9007199254740992\""), WriteJsonVerbose((long)Math.Pow(2, 53)));
+
+        // Negative boundary
+        Assert.AreEqual(ScalarVerbose("-9007199254740991"), WriteJsonVerbose(1 - (long)Math.Pow(2, 53)));
+        Assert.AreEqual(ScalarVerbose("\"~i-9007199254740992\""), WriteJsonVerbose(0 - (long)Math.Pow(2, 53)));
+    }
+
+    [TestMethod]
     public void TestWriteFloatDouble()
     {
         Assert.AreEqual(ScalarVerbose("42.5"), WriteJsonVerbose(42.5));

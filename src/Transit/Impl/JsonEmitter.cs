@@ -9,7 +9,7 @@ namespace Transit.Impl;
 /// </summary>
 internal class JsonEmitter : AbstractEmitter
 {
-    private static readonly long JsonIntMax = (long)Math.Pow(2, 53);
+    private static readonly long JsonIntMax = (long)Math.Pow(2, 53) - 1;
     private static readonly long JsonIntMin = -JsonIntMax;
 
     internal readonly Utf8JsonWriter JsonWriter;

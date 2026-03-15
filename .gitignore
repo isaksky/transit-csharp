@@ -221,3 +221,6 @@ pip-log.txt
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+/transit-format
+/transit-java
