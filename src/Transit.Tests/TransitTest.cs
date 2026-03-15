@@ -1313,5 +1313,888 @@ public class TransitTest
         Assert.AreEqual("value", readMapKey[null!]);
     }
 
+    [TestMethod]
+    public void TestVerifyString()
+    {
+        // Plain string roundtrip
+        Assert.AreEqual("foo", Reader(WriteJson("foo")).Read<string>());
+        Assert.AreEqual("foo", Reader(WriteJsonVerbose("foo")).Read<string>());
+
+        // Empty string
+        Assert.AreEqual("", Reader(WriteJson("")).Read<string>());
+        Assert.AreEqual("", Reader(WriteJsonVerbose("")).Read<string>());
+        Assert.AreEqual("", Reader("\"\"").Read<string>());
+
+        // Strings starting with ~ must be escaped as ~~
+        Assert.AreEqual("~foo", Reader(WriteJson("~foo")).Read<string>());
+        var tildeJson = WriteJson("~foo");
+        Assert.IsTrue(tildeJson.Contains("~~foo"), "~ prefix must be escaped to ~~");
+
+        // Strings starting with ` must be escaped as ~`
+        Assert.AreEqual("`foo", Reader(WriteJson("`foo")).Read<string>());
+        var backtickJson = WriteJson("`foo");
+        Assert.IsTrue(backtickJson.Contains("~`foo"), "` prefix must be escaped to ~`");
+
+        // Strings starting with ^ must be escaped as ~^
+        Assert.AreEqual("^foo", Reader(WriteJson("^foo")).Read<string>());
+        var caretJson = WriteJson("^foo");
+        Assert.IsTrue(caretJson.Contains("~^foo"), "^ prefix must be escaped to ~^");
+
+        // Strings as map keys (including special prefixes)
+        var d = new Dictionary<string, int> { ["~special"] = 10, ["^caret"] = 20, ["`backtick"] = 30 };
+        var readD = Reader(WriteJson(d)).Read<IDictionary>();
+        Assert.AreEqual(10L, readD["~special"]);
+        Assert.AreEqual(20L, readD["^caret"]);
+        Assert.AreEqual(30L, readD["`backtick"]);
+
+        // Long string roundtrip
+        var longStr = new string('x', 10000);
+        Assert.AreEqual(longStr, Reader(WriteJson(longStr)).Read<string>());
+
+        // Unicode
+        Assert.AreEqual("héllo 日本語", Reader(WriteJson("héllo 日本語")).Read<string>());
+    }
+
+    [TestMethod]
+    public void TestVerifyInteger()
+    {
+        // Roundtrip byte, short, int, long
+        Assert.AreEqual(42L, Reader(WriteJson((byte)42)).Read<long>());
+        Assert.AreEqual(42L, Reader(WriteJson((short)42)).Read<long>());
+        Assert.AreEqual(42L, Reader(WriteJson(42)).Read<long>());
+        Assert.AreEqual(42L, Reader(WriteJson(42L)).Read<long>());
+        Assert.AreEqual(0L, Reader(WriteJson(0)).Read<long>());
+        Assert.AreEqual(-1L, Reader(WriteJson(-1)).Read<long>());
+
+        // < 2^53 writes as bare JSON number
+        long belowBoundary = 9007199254740991L; // 2^53 - 1
+        var belowJson = WriteJson(belowBoundary);
+        Assert.IsFalse(belowJson.Contains("~i"), "Below 2^53 should not use ~i");
+        Assert.AreEqual(belowBoundary, Reader(belowJson).Read<long>());
+
+        // >= 2^53 writes as ~i string
+        long atBoundary = 9007199254740992L; // 2^53
+        var atJson = WriteJson(atBoundary);
+        Assert.IsTrue(atJson.Contains("~i"), ">= 2^53 should use ~i");
+        Assert.AreEqual(atBoundary, Reader(atJson).Read<long>());
+
+        // Negative boundary
+        Assert.AreEqual(-9007199254740992L, Reader(WriteJson(-9007199254740992L)).Read<long>());
+
+        // Integer as map key uses ~i form
+        var d = new Dictionary<long, string> { [42L] = "value" };
+        var mapJson = WriteJsonVerbose(d);
+        Assert.IsTrue(mapJson.Contains("\"~i42\""), "Integer map key must use ~i form");
+        var readD = Reader(mapJson).Read<IDictionary>();
+        Assert.AreEqual("value", readD[42L]);
+
+        // Read ~i tagged form
+        Assert.AreEqual(42L, Reader("\"~i42\"").Read<long>());
+        Assert.AreEqual(-999L, Reader("\"~i-999\"").Read<long>());
+    }
+
+    [TestMethod]
+    public void TestVerifyFloatingPoint()
+    {
+        // Roundtrip float and double
+        Assert.AreEqual(42.5, (double)Reader(WriteJson(42.5)).Read<object>(), 0.001);
+        Assert.AreEqual(42.5, (double)Reader(WriteJson(42.5f)).Read<object>(), 0.01);
+        Assert.AreEqual(42.5, (double)Reader(WriteJsonVerbose(42.5)).Read<object>(), 0.001);
+
+        // Negative
+        Assert.AreEqual(-3.14, (double)Reader(WriteJson(-3.14)).Read<object>(), 0.001);
+
+        // Very small
+        Assert.AreEqual(6.626e-34, (double)Reader(WriteJson(6.626e-34)).Read<object>(), 1e-40);
+
+        // Very large — note: JSON may serialize large doubles as integers, so cast via Convert
+        Assert.AreEqual(4.5e11, System.Convert.ToDouble(Reader(WriteJson(4.5e11)).Read<object>()), 1.0);
+
+        // Float as map key uses ~d form  
+        var d = new Dictionary<double, int> { [3.14] = 1 };
+        var mapJson = WriteJsonVerbose(d);
+        Assert.IsTrue(mapJson.Contains("\"~d"), "Float map key must use ~d form");
+        var readD = Reader(mapJson).Read<IDictionary>();
+        Assert.AreEqual(1L, readD[3.14]);
+
+        // Read ~d tagged form
+        Assert.AreEqual(42.5, Reader("\"~d42.5\"").Read<double>(), 0.001);
+    }
+
+    [TestMethod]
+    public void TestVerifyArbitraryPrecisionInteger()
+    {
+        // Basic roundtrip
+        var big = BigInteger.Parse("4256768765123454321897654321234567");
+        Assert.AreEqual(big, Reader(WriteJson(big)).Read<BigInteger>());
+        Assert.AreEqual(big, Reader(WriteJsonVerbose(big)).Read<BigInteger>());
+
+        // Negative
+        var negBig = BigInteger.Parse("-999999999999999999999999999");
+        Assert.AreEqual(negBig, Reader(WriteJson(negBig)).Read<BigInteger>());
+
+        // Small BigInteger still uses ~n
+        Assert.AreEqual(new BigInteger(42), Reader(WriteJson(new BigInteger(42))).Read<BigInteger>());
+        var smallBigJson = WriteJson(new BigInteger(42));
+        Assert.IsTrue(smallBigJson.Contains("~n42"), "BigInteger always uses ~n tag");
+
+        // Read from string
+        Assert.AreEqual(BigInteger.Parse("9223372036854775808"),
+            Reader("\"~n9223372036854775808\"").Read<BigInteger>());
+    }
+
+    [TestMethod]
+    public void TestVerifyKeyword()
+    {
+        // Roundtrip
+        var kw = TransitFactory.Keyword("foo");
+        Assert.AreEqual("foo", Reader(WriteJson(kw)).Read<IKeyword>().ToString());
+        Assert.AreEqual("foo", Reader(WriteJsonVerbose(kw)).Read<IKeyword>().ToString());
+
+        // Encoding contains ~:
+        Assert.IsTrue(WriteJson(kw).Contains("~:foo"));
+
+        // Keywords as map keys
+        var d = new Dictionary<object, object> { [TransitFactory.Keyword("name")] = "test" };
+        var json = WriteJson(d);
+        var readD = Reader(json).Read<IDictionary>();
+        Assert.AreEqual("test", readD[TransitFactory.Keyword("name")]);
+
+        // Keyword equality
+        Assert.AreEqual(TransitFactory.Keyword("abc"), TransitFactory.Keyword("abc"));
+        Assert.AreNotEqual(TransitFactory.Keyword("abc"), TransitFactory.Keyword("xyz"));
+
+        // Keyword caching (> 3 chars total: ~:foo = 5 chars)
+        IList l = new IKeyword[] { TransitFactory.Keyword("longkey"), TransitFactory.Keyword("longkey") };
+        var cached = WriteJson(l);
+        Assert.IsTrue(cached.Contains("^"), "Keywords > 3 chars should be cached in JSON mode");
+    }
+
+    [TestMethod]
+    public void TestVerifySymbol()
+    {
+        // Roundtrip
+        var sym = TransitFactory.Symbol("foo");
+        Assert.AreEqual("foo", Reader(WriteJson(sym)).Read<ISymbol>().ToString());
+        Assert.AreEqual("foo", Reader(WriteJsonVerbose(sym)).Read<ISymbol>().ToString());
+
+        // Encoding contains ~$
+        Assert.IsTrue(WriteJson(sym).Contains("~$foo"));
+
+        // Symbol equality
+        Assert.AreEqual(TransitFactory.Symbol("abc"), TransitFactory.Symbol("abc"));
+        Assert.AreNotEqual(TransitFactory.Symbol("abc"), TransitFactory.Symbol("xyz"));
+
+        // Symbol as map key
+        var d = new Dictionary<object, object> { [TransitFactory.Symbol("mysym")] = 42L };
+        var json = WriteJson(d);
+        var readD = Reader(json).Read<IDictionary>();
+        Assert.AreEqual(42L, readD[TransitFactory.Symbol("mysym")]);
+    }
+
+    [TestMethod]
+    public void TestVerifyChar()
+    {
+        // Roundtrip
+        Assert.AreEqual('f', Reader(WriteJson('f')).Read<char>());
+        Assert.AreEqual('f', Reader(WriteJsonVerbose('f')).Read<char>());
+
+        // Special characters
+        Assert.AreEqual(' ', Reader("\"~c \"").Read<char>());
+        Assert.AreEqual('~', Reader("\"~c~\"").Read<char>());
+
+        // Char arrays
+        char[] chars = { 'a', 'b', 'c' };
+        var json = WriteJsonVerbose(chars);
+        var list = Reader(json).Read<IList>();
+        Assert.AreEqual('a', list[0]);
+        Assert.AreEqual('b', list[1]);
+        Assert.AreEqual('c', list[2]);
+    }
+
+    [TestMethod]
+    public void TestVerifyBinary()
+    {
+        // Roundtrip
+        byte[] bytes = Encoding.UTF8.GetBytes("Hello, Transit!");
+        var json = WriteJson(bytes);
+        Assert.IsTrue(json.Contains("~b"), "Binary should use ~b tag");
+        byte[] decoded = Reader(json).Read<byte[]>();
+        CollectionAssert.AreEqual(bytes, decoded);
+
+        // Verbose mode
+        byte[] decoded2 = Reader(WriteJsonVerbose(bytes)).Read<byte[]>();
+        CollectionAssert.AreEqual(bytes, decoded2);
+
+        // Empty byte array
+        byte[] empty = Array.Empty<byte>();
+        byte[] decodedEmpty = Reader(WriteJson(empty)).Read<byte[]>();
+        Assert.AreEqual(0, decodedEmpty.Length);
+
+        // Arbitrary bytes (non-UTF8)
+        byte[] arbitrary = { 0x00, 0xFF, 0x7F, 0x80, 0x01 };
+        byte[] decodedArb = Reader(WriteJson(arbitrary)).Read<byte[]>();
+        CollectionAssert.AreEqual(arbitrary, decodedArb);
+    }
+
+    [TestMethod]
+    public void TestVerifyUuid()
+    {
+        // String form roundtrip
+        var guid = Guid.NewGuid();
+        Assert.AreEqual(guid, Reader(WriteJson(guid)).Read<Guid>());
+        Assert.AreEqual(guid, Reader(WriteJsonVerbose(guid)).Read<Guid>());
+
+        // Encoding contains ~u
+        Assert.IsTrue(WriteJsonVerbose(guid).Contains("~u" + guid.ToString()));
+
+        // hi64/lo64 array form
+        long hi64 = ((Transit.Java.Uuid)guid).MostSignificantBits;
+        long lo64 = ((Transit.Java.Uuid)guid).LeastSignificantBits;
+        var readFromArray = Reader("{\"~#u\": [" + hi64 + ", " + lo64 + "]}").Read<Guid>();
+        Assert.AreEqual(guid, readFromArray);
+
+        // UUID as map key
+        var d = new Dictionary<Guid, string> { [guid] = "value" };
+        var readD = Reader(WriteJsonVerbose(d)).Read<IDictionary>();
+        Assert.AreEqual("value", readD[guid]);
+
+        // Known UUID roundtrip
+        var known = Guid.Parse("531a379e-31bb-4ce1-8690-158dceb64be6");
+        Assert.AreEqual(known, Reader("\"~u531a379e-31bb-4ce1-8690-158dceb64be6\"").Read<Guid>());
+    }
+
+    [TestMethod]
+    public void TestVerifyUri()
+    {
+        // Basic roundtrip
+        var uri = new Uri("http://www.example.com/path?q=1");
+        Assert.AreEqual(uri, Reader(WriteJson(uri)).Read<Uri>());
+        Assert.AreEqual(uri, Reader(WriteJsonVerbose(uri)).Read<Uri>());
+
+        // Various schemes
+        Assert.AreEqual(new Uri("https://secure.example.com"),
+            Reader("\"~rhttps://secure.example.com\"").Read<Uri>());
+        Assert.AreEqual(new Uri("ftp://files.example.com/file.txt"),
+            Reader("\"~rftp://files.example.com/file.txt\"").Read<Uri>());
+        Assert.AreEqual(new Uri("mailto:user@example.com"),
+            Reader("\"~rmailto:user@example.com\"").Read<Uri>());
+
+        // URI as map key
+        var d = new Dictionary<Uri, string> { [uri] = "value" };
+        var readD = Reader(WriteJsonVerbose(d)).Read<IDictionary>();
+        Assert.AreEqual("value", readD[uri]);
+    }
+
+    [TestMethod]
+    public void TestVerifyDateTime()
+    {
+        // JSON machine mode uses ~m (milliseconds)
+        var d = DateTime.UtcNow;
+        var jsonMachine = WriteJson(d);
+        Assert.IsTrue(jsonMachine.Contains("~m"), "JSON mode should use ~m tag");
+        var readMachine = Reader(jsonMachine).Read<DateTime>();
+        // millisecond precision
+        Assert.AreEqual(d.Year, readMachine.Year);
+        Assert.AreEqual(d.Month, readMachine.Month);
+        Assert.AreEqual(d.Day, readMachine.Day);
+
+        // Verbose mode uses ~t (RFC 3339)
+        var jsonVerbose = WriteJsonVerbose(d);
+        Assert.IsTrue(jsonVerbose.Contains("~t"), "JSON-Verbose should use ~t tag");
+
+        // Pre-1970 timestamps
+        var pre1970 = new DateTime(1776, 7, 4, 12, 0, 0, DateTimeKind.Utc);
+        var pre1970Read = Reader(WriteJson(pre1970)).Read<DateTime>();
+        Assert.AreEqual(pre1970.Year, pre1970Read.Year);
+        Assert.AreEqual(pre1970.Month, pre1970Read.Month);
+
+        // Epoch exactly
+        var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Assert.IsTrue(WriteJson(epoch).Contains("~m0"), "Epoch should encode as ~m0");
+
+        // Date as map key
+        var mapD = new Dictionary<DateTime, string> { [d] = "now" };
+        var readMapD = Reader(WriteJsonVerbose(mapD)).Read<IDictionary>();
+        Assert.AreEqual(1, readMapD.Count);
+    }
+
+    [TestMethod]
+    public void TestVerifySpecialNumbers()
+    {
+        // NaN roundtrip
+        Assert.AreEqual(double.NaN, Reader(WriteJson(double.NaN)).Read<double>());
+        Assert.AreEqual(double.NaN, Reader(WriteJsonVerbose(double.NaN)).Read<double>());
+
+        // Positive infinity
+        Assert.AreEqual(double.PositiveInfinity, Reader(WriteJson(double.PositiveInfinity)).Read<double>());
+        Assert.AreEqual(double.PositiveInfinity, Reader(WriteJsonVerbose(double.PositiveInfinity)).Read<double>());
+
+        // Negative infinity
+        Assert.AreEqual(double.NegativeInfinity, Reader(WriteJson(double.NegativeInfinity)).Read<double>());
+        Assert.AreEqual(double.NegativeInfinity, Reader(WriteJsonVerbose(double.NegativeInfinity)).Read<double>());
+
+        // Float variants
+        Assert.AreEqual(double.NaN, Reader(WriteJson(float.NaN)).Read<double>());
+        Assert.AreEqual(double.PositiveInfinity, Reader(WriteJson(float.PositiveInfinity)).Read<double>());
+        Assert.AreEqual(double.NegativeInfinity, Reader(WriteJson(float.NegativeInfinity)).Read<double>());
+
+        // Encoding uses ~z tag
+        Assert.IsTrue(WriteJson(double.NaN).Contains("~zNaN"));
+        Assert.IsTrue(WriteJson(double.PositiveInfinity).Contains("~zINF"));
+        Assert.IsTrue(WriteJson(double.NegativeInfinity).Contains("~z-INF"));
+    }
+
+    [TestMethod]
+    public void TestVerifyArray()
+    {
+        // Empty array
+        var empty = new List<object>();
+        Assert.AreEqual("[]", WriteJsonVerbose(empty));
+        var readEmpty = Reader(WriteJson(empty)).Read<IList>();
+        Assert.AreEqual(0, readEmpty.Count);
+
+        // Simple array
+        var simple = new List<object> { 1L, 2L, 3L };
+        var readSimple = Reader(WriteJson(simple)).Read<IList>();
+        Assert.AreEqual(3, readSimple.Count);
+        Assert.AreEqual(1L, readSimple[0]);
+
+        // Mixed-type array
+        var mixed = new List<object> { "hello", 42L, true, TransitFactory.Keyword("kw") };
+        var readMixed = Reader(WriteJson(mixed)).Read<IList>();
+        Assert.AreEqual(4, readMixed.Count);
+        Assert.AreEqual("hello", readMixed[0]);
+        Assert.AreEqual(42L, readMixed[1]);
+        Assert.AreEqual(true, readMixed[2]);
+        Assert.AreEqual("kw", readMixed[3]!.ToString());
+
+        // Nested arrays
+        var nested = new List<object> { new List<object> { 1L, 2L }, new List<object> { 3L, 4L } };
+        var readNested = Reader(WriteJson(nested)).Read<IList>();
+        Assert.AreEqual(2, readNested.Count);
+        Assert.AreEqual(2, ((IList)readNested[0]!).Count);
+    }
+
+    [TestMethod]
+    public void TestVerifyList()
+    {
+        // IEnumerable (linked list) encodes as ~#list
+        var linked = new LinkedList<object>();
+        linked.AddLast("a");
+        linked.AddLast("b");
+        IEnumerable<object> e = linked;
+
+        var json = WriteJson(e);
+        Assert.IsTrue(json.Contains("~#list"), "IEnumerable should encode as ~#list");
+        var read = Reader(json).Read<IEnumerable>().Cast<object>().ToList();
+        Assert.AreEqual(2, read.Count);
+        Assert.AreEqual("a", read[0]);
+        Assert.AreEqual("b", read[1]);
+
+        // Empty list
+        var emptyLinked = new LinkedList<object>();
+        IEnumerable<object> emptyEnum = emptyLinked;
+        var emptyJson = WriteJson(emptyEnum);
+        Assert.IsTrue(emptyJson.Contains("~#list"));
+        var readEmpty = Reader(emptyJson).Read<IEnumerable>().Cast<object>().ToList();
+        Assert.AreEqual(0, readEmpty.Count);
+
+        // Verbose mode uses {~#list: [...]}
+        var verboseJson = WriteJsonVerbose(e);
+        Assert.IsTrue(verboseJson.Contains("\"~#list\""));
+    }
+
+    [TestMethod]
+    public void TestVerifyMap()
+    {
+        // Simple map roundtrip
+        var m = new Dictionary<string, object> { ["a"] = 1L, ["b"] = 2L };
+        var readM = Reader(WriteJson(m)).Read<IDictionary>();
+        Assert.AreEqual(1L, readM["a"]);
+        Assert.AreEqual(2L, readM["b"]);
+
+        // JSON mode uses "^ " marker
+        var jsonMap = WriteJson(m);
+        Assert.IsTrue(jsonMap.Contains("\"^ \""), "JSON mode should use array-map marker");
+
+        // Verbose mode uses JSON object
+        var verboseMap = WriteJsonVerbose(m);
+        Assert.IsTrue(verboseMap.StartsWith("{"), "Verbose mode should use JSON object");
+
+        // Empty map
+        var emptyM = new Dictionary<string, object>();
+        Assert.AreEqual("[\"^ \"]", WriteJson(emptyM));
+        Assert.AreEqual("{}", WriteJsonVerbose(emptyM));
+
+        // Nested maps
+        var nested = new Dictionary<string, object>
+        {
+            ["inner"] = new Dictionary<string, object> { ["deep"] = 42L }
+        };
+        var readNested = Reader(WriteJson(nested)).Read<IDictionary>();
+        Assert.AreEqual(42L, ((IDictionary)readNested["inner"]!)["deep"]);
+
+        // Map with keyword keys
+        var kwMap = new Dictionary<object, object>
+        {
+            [TransitFactory.Keyword("name")] = "alice",
+            [TransitFactory.Keyword("age")] = 30L
+        };
+        var readKw = Reader(WriteJson(kwMap)).Read<IDictionary>();
+        Assert.AreEqual("alice", readKw[TransitFactory.Keyword("name")]);
+        Assert.AreEqual(30L, readKw[TransitFactory.Keyword("age")]);
+    }
+
+    [TestMethod]
+    public void TestVerifyCmap()
+    {
+        // Map with composite keys falls back to cmap
+        IRatio r = new Ratio(BigInteger.One, new BigInteger(3));
+        var d = new Dictionary<object, object> { [r] = "ratio-key" };
+        var json = WriteJson(d);
+        Assert.IsTrue(json.Contains("~#cmap"), "Composite key map should encode as cmap");
+        var readD = Reader(json).Read<IDictionary>();
+        Assert.AreEqual(1, readD.Count);
+
+        // Verbose
+        var verboseJson = WriteJsonVerbose(d);
+        Assert.IsTrue(verboseJson.Contains("~#cmap"));
+
+        // cmap with null key
+        var d2 = new NullKeyDictionary();
+        d2[null] = "null-value";
+        d2[new List<object> { 1L }] = "array-value";
+        var json2 = WriteJson(d2);
+        Assert.IsTrue(json2.Contains("~#cmap"));
+        var readD2 = Reader(json2).Read<IDictionary>();
+        Assert.AreEqual("null-value", readD2[null!]);
+    }
+
+    [TestMethod]
+    public void TestVerifySet()
+    {
+        // Roundtrip
+        var s = new HashSet<object> { 1L, 2L, 3L };
+        var json = WriteJson(s);
+        Assert.IsTrue(json.Contains("~#set"), "Set should encode as ~#set");
+        var readS = Reader(json).Read<ISet<object>>();
+        Assert.AreEqual(3, readS.Count);
+        Assert.IsTrue(readS.Contains(1L));
+        Assert.IsTrue(readS.Contains(2L));
+        Assert.IsTrue(readS.Contains(3L));
+
+        // Verbose
+        Assert.IsTrue(WriteJsonVerbose(s).Contains("\"~#set\""));
+
+        // Empty set
+        var empty = new HashSet<object>();
+        var readEmpty = Reader(WriteJson(empty)).Read<ISet<object>>();
+        Assert.AreEqual(0, readEmpty.Count);
+
+        // Set with mixed types
+        var mixed = new HashSet<object> { "hello", 42L, true };
+        var readMixed = Reader(WriteJson(mixed)).Read<ISet<object>>();
+        Assert.AreEqual(3, readMixed.Count);
+        Assert.IsTrue(readMixed.Contains("hello"));
+        Assert.IsTrue(readMixed.Contains(42L));
+        Assert.IsTrue(readMixed.Contains(true));
+    }
+
+    [TestMethod]
+    public void TestVerifyRatio()
+    {
+        // Roundtrip
+        IRatio r = new Ratio(BigInteger.One, new BigInteger(3));
+        var json = WriteJson(r);
+        Assert.IsTrue(json.Contains("~#ratio"), "Ratio should encode as ~#ratio");
+        var readR = Reader(json).Read<IRatio>();
+        Assert.AreEqual(BigInteger.One, readR.Numerator);
+        Assert.AreEqual(new BigInteger(3), readR.Denominator);
+
+        // Verbose
+        var verbose = WriteJsonVerbose(r);
+        Assert.IsTrue(verbose.Contains("\"~#ratio\""));
+
+        // Value check
+        Assert.AreEqual(1.0 / 3.0, readR.GetValue(), 0.0001);
+    }
+
+    [TestMethod]
+    public void TestVerifyQuotedValues()
+    {
+        // Top-level scalars are quoted
+        var jsonStr = WriteJson("hello");
+        Assert.IsTrue(jsonStr.Contains("~#'"), "Top-level scalar should be quoted");
+        Assert.AreEqual("hello", Reader(jsonStr).Read<string>());
+
+        // Top-level null
+        var jsonNull = WriteJson(null);
+        Assert.IsTrue(jsonNull.Contains("~#'"), "Top-level null should be quoted");
+        Assert.IsNull(Reader(jsonNull).Read<object>());
+
+        // Top-level bool
+        Assert.IsTrue(WriteJson(true).Contains("~#'"));
+        Assert.AreEqual(true, Reader(WriteJson(true)).Read<bool>());
+
+        // Top-level integer  
+        Assert.IsTrue(WriteJson(42).Contains("~#'"));
+        Assert.AreEqual(42L, Reader(WriteJson(42)).Read<long>());
+
+        // Verbose mode uses {~#': value}
+        Assert.IsTrue(WriteJsonVerbose("hello").Contains("\"~#'\""));
+
+        // Arrays/maps are NOT quoted at top level
+        var list = new List<object> { 1L, 2L };
+        Assert.IsFalse(WriteJson(list).Contains("~#'"), "Arrays should not be quoted");
+    }
+
+    [TestMethod]
+    public void TestVerifyTaggedValue()
+    {
+        // TaggedValue roundtrip
+        var tv = TransitFactory.TaggedValue("point", new List<object> { 1L, 2L });
+        var json = WriteJson(tv);
+        Assert.IsTrue(json.Contains("~#point"));
+        var readTv = Reader(json).Read<ITaggedValue>();
+        Assert.AreEqual("point", readTv.Tag);
+        var rep = (IList<object>)readTv.Representation;
+        Assert.AreEqual(1L, rep[0]);
+        Assert.AreEqual(2L, rep[1]);
+
+        // Verbose
+        var verbose = WriteJsonVerbose(tv);
+        Assert.IsTrue(verbose.Contains("\"~#point\""));
+
+        // Unknown single-char tag
+        var unknown = Reader("\"~jfoo\"").Read<ITaggedValue>();
+        Assert.AreEqual("j", unknown.Tag);
+        Assert.AreEqual("foo", unknown.Representation);
+    }
+
+    [TestMethod]
+    public void TestVerifyLink()
+    {
+        // Full link roundtrip
+        var link = TransitFactory.Link("http://example.com/", "rel", "name", "prompt", "link");
+        var json = WriteJson(link);
+        Assert.IsTrue(json.Contains("~#link"));
+        var readLink = Reader(json).Read<ILink>();
+        Assert.AreEqual("http://example.com/", readLink.Href.AbsoluteUri);
+        Assert.AreEqual("rel", readLink.Rel);
+        Assert.AreEqual("name", readLink.Name);
+        Assert.AreEqual("prompt", readLink.Prompt);
+        Assert.AreEqual("link", readLink.Render);
+
+        // Verbose
+        var verbose = WriteJsonVerbose(link);
+        Assert.IsTrue(verbose.Contains("\"~#link\""));
+        var readVerbose = Reader(verbose).Read<ILink>();
+        Assert.AreEqual("http://example.com/", readVerbose.Href.AbsoluteUri);
+
+        // Minimal link (only required fields)
+        var minLink = TransitFactory.Link("http://min.com/", "rel-only");
+        var readMin = Reader(WriteJson(minLink)).Read<ILink>();
+        Assert.AreEqual("http://min.com/", readMin.Href.AbsoluteUri);
+        Assert.AreEqual("rel-only", readMin.Rel);
+    }
+
+    [TestMethod]
+    public void TestVerifySpecialCharEscaping()
+    {
+        // ~ at start is escaped to ~~
+        Assert.AreEqual("~hello", Reader(WriteJson("~hello")).Read<string>());
+
+        // ` at start is escaped to ~`
+        Assert.AreEqual("`hello", Reader(WriteJson("`hello")).Read<string>());
+
+        // ^ at start is escaped to ~^
+        Assert.AreEqual("^hello", Reader(WriteJson("^hello")).Read<string>());
+
+        // "^ " (map-as-array marker) in a list must be escaped
+        var l = new List<object> { "^ " };
+        var json = WriteJson(l);
+        Assert.IsTrue(json.Contains("~^ "), "^ marker must be escaped in arrays");
+        var readL = Reader(json).Read<IList<object>>();
+        Assert.AreEqual("^ ", readL[0]);
+
+        // Double-escape: ~~foo reads back to ~foo
+        Assert.AreEqual("~foo", Reader("\"~~foo\"").Read<string>());
+
+        // ~_ is null, ~~_ is the literal string "~_"
+        Assert.IsNull(Reader("\"~_\"").Read<object>());
+        Assert.AreEqual("~_", Reader("\"~~_\"").Read<string>());
+
+        // ~#tag is a tag, ~~#tag is the string "~#tag"
+        Assert.IsInstanceOfType<ITaggedValue>(Reader("{\"~#foo\": 1}").Read<object>());
+        // Map with string key "~#set" (double-escaped)
+        var m = Reader("{\"~~#set\": 1}").Read<IDictionary>();
+        Assert.IsTrue(m.Contains("~#set"));
+    }
+
+    [TestMethod]
+    public void TestVerifyWriteCache()
+    {
+        // Keywords > 3 chars are cached in JSON mode
+        var kws = Enumerable.Range(0, 5)
+            .SelectMany(_ => new[] { TransitFactory.Keyword("alpha"), TransitFactory.Keyword("beta1") })
+            .ToList();
+        var json = WriteJson(kws);
+        Assert.IsTrue(json.Contains("^"), "Repeated keywords should be cached");
+
+        // Short values <= 3 chars are NOT cached
+        var shortKws = new List<object> { TransitFactory.Keyword("ab"), TransitFactory.Keyword("ab") };
+        var shortJson = WriteJson(shortKws);
+        // ~:ab = 4 chars, so it IS long enough to cache
+        // But ~:a = 3 chars would not be. Let's test with single-char keyword:
+        var singleCharKws = new List<object> { TransitFactory.Keyword("a"), TransitFactory.Keyword("a") };
+        var singleCharJson = WriteJson(singleCharKws);
+        // ~:a is exactly 3 chars - should NOT be cached
+        Assert.IsFalse(singleCharJson.Contains("^"), "Keywords <= 3 chars total should not be cached");
+
+        // Verbose mode has caching disabled
+        var verboseJson = WriteJsonVerbose(kws);
+        Assert.IsFalse(verboseJson.Contains("^"), "Verbose mode should not cache");
+
+        // Cache codes use ^ prefix
+        var wc = new WriteCache(true);
+        Assert.AreEqual("~:longkey", wc.CacheWrite("~:longkey", false)); // first occurrence
+        Assert.AreEqual("^" + (char)WriteCache.BaseCharIdx, wc.CacheWrite("~:longkey", false)); // cached
+
+        // Cache wraps at 44^2
+        var wc2 = new WriteCache(true);
+        for (int i = 0; i < 44 * 44 + 1; i++)
+        {
+            string key = "~:key_pad_" + i.ToString("D6");
+            wc2.CacheWrite(key, false);
+        }
+        // After wrapping, should still function (first entry after wrap is stored fresh)
+        string afterWrap = "~:after_wrap";
+        Assert.AreEqual(afterWrap, wc2.CacheWrite(afterWrap, false));
+    }
+
+    [TestMethod]
+    public void TestVerifyReadCache()
+    {
+        // Read cache resolves codes correctly
+        var rc = new ReadCache();
+        Assert.AreEqual("~:longkey", rc.CacheRead("~:longkey", false));
+        Assert.AreEqual("~:longkey", rc.CacheRead("^" + (char)WriteCache.BaseCharIdx, false));
+
+        // Cache stays in sync between reader and writer across a write-then-read
+        var data = new Dictionary<object, object>();
+        for (int i = 0; i < 50; i++)
+            data[TransitFactory.Keyword("key" + i.ToString("D3"))] = (long)i;
+        var readData = Reader(WriteJson(data)).Read<IDictionary>();
+        for (int i = 0; i < 50; i++)
+            Assert.AreEqual((long)i, readData[TransitFactory.Keyword("key" + i.ToString("D3"))]);
+
+        // Large cache boundary test: 1935-1937 keywords (near 44^2 = 1936)
+        var bigList = new List<object>();
+        for (int i = 0; i < 1937; i++)
+            bigList.Add(TransitFactory.Keyword("kw" + i.ToString("D5")));
+        var readBig = Reader(WriteJson(bigList)).Read<IList>();
+        Assert.AreEqual(1937, readBig.Count);
+        Assert.AreEqual("kw00000", readBig[0]!.ToString());
+        Assert.AreEqual("kw01936", readBig[1936]!.ToString());
+    }
+
+    [TestMethod]
+    public void TestVerifyCustomReadHandlers()
+    {
+        // Custom handler for known tag
+        var handlers = new Dictionary<string, IReadHandler>
+        {
+            ["point"] = new PointReadHandler()
+        };
+        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[10,20]]"));
+        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, handlers, null);
+        var point = reader.Read<Point>();
+        Assert.AreEqual(new Point(10, 20), point);
+
+        // Default handler catches unrecognized tags
+        var defaultHandler = new CatchAllDefaultReadHandler();
+        var input2 = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#widget\",[1,2,3]]"));
+        var reader2 = TransitFactory.Reader(TransitFactory.Format.Json, input2, null, defaultHandler);
+        var result = reader2.Read<string>();
+        Assert.IsTrue(result.Contains("widget"));
+    }
+
+    [TestMethod]
+    public void TestVerifyCustomWriteHandlers()
+    {
+        // Custom write handler
+        var handlers = new Dictionary<Type, IWriteHandler>
+        {
+            [typeof(Point)] = new PointWriteHandler()
+        };
+        var json = WriteJson(new Point(5, 10), handlers);
+        Assert.IsTrue(json.Contains("~#point"));
+        Assert.IsTrue(json.Contains("[5,10]"));
+
+        // Verbose handler
+        var verbose = WriteJsonVerbose(new Point(5, 10), handlers);
+        Assert.IsTrue(verbose.Contains("~#point"));
+
+        // Handler cache not corrupted across multiple writers
+        for (int i = 0; i < 3; i++)
+        {
+            using var output = new MemoryStream();
+            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, handlers);
+            w.Write(new Point(i, i));
+            output.Position = 0;
+            var json2 = new StreamReader(output).ReadToEnd();
+            Assert.IsTrue(json2.Contains($"[{i},{i}]"));
+        }
+    }
+
+    [TestMethod]
+    public void TestVerifyRoundtripAllTypes()
+    {
+        // Scalar types roundtrip in both modes
+        AssertRoundtrip("hello");
+        AssertRoundtrip(42L);
+        AssertRoundtrip(42.5);
+        AssertRoundtrip(true);
+        AssertRoundtrip(false);
+        AssertRoundtrip('x');
+        AssertRoundtripByEquals(TransitFactory.Keyword("test"));
+        AssertRoundtripByEquals(TransitFactory.Symbol("sym"));
+        AssertRoundtripByEquals(new Uri("http://example.com/"));
+        AssertRoundtripByEquals(Guid.NewGuid());
+
+        // BigInteger
+        var big = BigInteger.Parse("123456789012345678901234567890");
+        Assert.AreEqual(big, Reader(WriteJson(big)).Read<BigInteger>());
+
+        // BigRational
+        var br = new BigRational(12.345M);
+        Assert.AreEqual(br, Reader(WriteJson(br)).Read<BigRational>());
+
+        // Composites
+        var list = new List<object> { 1L, "two", true };
+        var readList = Reader(WriteJson(list)).Read<IList>();
+        Assert.AreEqual(3, readList.Count);
+        Assert.AreEqual("two", readList[1]);
+
+        var set = new HashSet<object> { 1L, 2L };
+        var readSet = Reader(WriteJson(set)).Read<ISet<object>>();
+        Assert.IsTrue(readSet.Contains(1L));
+
+        var map = new Dictionary<string, object> { ["key"] = "value" };
+        var readMap = Reader(WriteJson(map)).Read<IDictionary>();
+        Assert.AreEqual("value", readMap["key"]);
+
+        // Nested structure
+        var nested = new Dictionary<string, object>
+        {
+            ["list"] = new List<object> { 1L, new Dictionary<string, object> { ["a"] = 2L } },
+            ["set"] = new HashSet<object> { "x", "y" }
+        };
+        var readNested = Reader(WriteJson(nested)).Read<IDictionary>();
+        var innerList = (IList)readNested["list"]!;
+        var innerMap = (IDictionary)innerList[1]!;
+        Assert.AreEqual(2L, innerMap["a"]);
+    }
+
+    private void AssertRoundtrip(object value)
+    {
+        Assert.AreEqual(value, Reader(WriteJson(value)).Read<object>());
+        Assert.AreEqual(value, Reader(WriteJsonVerbose(value)).Read<object>());
+    }
+
+    private void AssertRoundtripByEquals(object value)
+    {
+        var readJson = Reader(WriteJson(value)).Read<object>();
+        var readVerbose = Reader(WriteJsonVerbose(value)).Read<object>();
+        Assert.AreEqual(value, readJson);
+        Assert.AreEqual(value, readVerbose);
+    }
+
+    [TestMethod]
+    public void TestVerifyErrorHandling()
+    {
+        // Writing unregistered type throws NotSupportedException
+        Assert.ThrowsException<NotSupportedException>(() => WriteJson(new object()));
+        Assert.ThrowsException<NotSupportedException>(() => WriteJsonVerbose(new object()));
+
+        // Reading empty stream throws some JSON-related exception
+        bool threw = false;
+        try
+        {
+            var input = new MemoryStream(Array.Empty<byte>());
+            TransitFactory.Reader(TransitFactory.Format.Json, input).Read<object>();
+        }
+        catch (Exception ex) when (ex.GetType().Name.Contains("Json"))
+        {
+            threw = true;
+        }
+        Assert.IsTrue(threw, "Reading empty stream should throw a JSON exception");
+    }
+
+    [TestMethod]
+    public void TestVerifyExemplarFiles()
+    {
+        // Locate exemplar directory by searching upward from known project paths
+        string? exemplarDir = null;
+        // Try common known paths
+        string[] candidates = {
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "transit-format", "examples", "0.8", "simple")),
+            "/Users/is/src/transit-csharp/transit-format/examples/0.8/simple",
+        };
+        foreach (var c in candidates)
+        {
+            if (Directory.Exists(c)) { exemplarDir = c; break; }
+        }
+        // If still not found, search upward from BaseDirectory
+        if (exemplarDir == null)
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                var candidate = Path.Combine(dir.FullName, "transit-format", "examples", "0.8", "simple");
+                if (Directory.Exists(candidate)) { exemplarDir = candidate; break; }
+                dir = dir.Parent;
+            }
+        }
+        Assert.IsNotNull(exemplarDir, "Could not find transit-format exemplar directory");
+
+        // Test a selection of exemplar files that should decode without error
+        string[] exemplarNames = {
+            "one_string", "one", "true", "false",
+            "ints", "ints_interesting",
+            "doubles_small", "doubles_interesting",
+            "keywords", "symbols",
+            "list_simple", "list_empty", "list_mixed", "list_nested",
+            "map_simple", "map_string_keys", "map_numeric_keys",
+            "set_simple", "set_empty",
+            "nil",
+        };
+
+        int tested = 0;
+        foreach (var name in exemplarNames)
+        {
+            string jsonPath = Path.Combine(exemplarDir, name + ".json");
+            string verbosePath = Path.Combine(exemplarDir, name + ".verbose.json");
+
+            if (File.Exists(jsonPath))
+            {
+                var jsonContent = File.ReadAllText(jsonPath);
+                var result = Reader(jsonContent).Read<object>();
+                // Just verify it decodes without throwing
+                tested++;
+            }
+
+            if (File.Exists(verbosePath))
+            {
+                var verboseContent = File.ReadAllText(verbosePath);
+                var result = Reader(verboseContent).Read<object>();
+                tested++;
+            }
+        }
+
+        Assert.IsTrue(tested > 0, $"Should have tested at least one exemplar file. Looked in: {exemplarDir}");
+    }
+
     #endregion
 }
