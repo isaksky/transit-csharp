@@ -211,6 +211,18 @@ public class TransitTest
     }
 
     [TestMethod]
+    public void TestReadArrayWithNestedDoubles()
+    {
+        var l = Reader("[-3.14159, 3.14159, 4.0E11, 2.998E8, 6.626E-34]").Read<IList>();
+        Assert.AreEqual(5, l.Count);
+        Assert.AreEqual(-3.14159, (double)l[0]!, 0.00001);
+        Assert.AreEqual(3.14159, (double)l[1]!, 0.00001);
+        Assert.AreEqual(4.0E11, (double)l[2]!, 1.0);
+        Assert.AreEqual(2.998E8, (double)l[3]!, 1.0);
+        Assert.AreEqual(6.626E-34, (double)l[4]!, 1E-40);
+    }
+
+    [TestMethod]
     public void TestReadDictionary()
     {
         var m = Reader("{\"a\": 2, \"b\": 4}").Read<IDictionary>();
@@ -291,6 +303,26 @@ public class TransitTest
     }
 
     [TestMethod]
+    public void TestReadCDictionaryWithNullKey()
+    {
+        var m2 = Reader("[\"~#cmap\",[null,\"null as map key\",[\"1\",\"2\"],\"Array as key to force cmap\"]]").Read<IDictionary>();
+        Assert.AreEqual(2, m2.Count);
+        Assert.AreEqual("null as map key", m2[null!]);
+        var key = new List<object> { "1", "2" };
+        // Find entry with array key by iterating (since List doesn't implement structural equality for dictionary lookup)
+        string? arrayKeyValue = null;
+        foreach (DictionaryEntry e in m2)
+        {
+            if (e.Key is IList<object> l && l.Count == 2 && l[0].Equals("1") && l[1].Equals("2"))
+            {
+                arrayKeyValue = (string)e.Value!;
+            }
+        }
+        Assert.AreEqual("Array as key to force cmap", arrayKeyValue);
+        Assert.IsTrue(m2.Contains(null!));
+    }
+
+    [TestMethod]
     public void TestReadSetTagAsString()
     {
         var o = Reader("{\"~~#set\": [1, 2, 3]}").Read<object>();
@@ -335,6 +367,14 @@ public class TransitTest
         // System.Text.Json doesn't accept \' escape - use the valid encoding
         var v = Reader("\"~'42\"").Read<string>();
         Assert.AreEqual("42", v);
+    }
+
+    [TestMethod]
+    public void TestReadWithNoCustomHandlers()
+    {
+        var input = new MemoryStream(Encoding.UTF8.GetBytes("\"foo\""));
+        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, null);
+        Assert.AreEqual("foo", reader.Read<string>());
     }
 
     [TestMethod]
@@ -683,6 +723,23 @@ public class TransitTest
     }
 
     [TestMethod]
+    public void TestWriteCDictionaryWithNullKey()
+    {
+        var d = new Transit.Impl.NullKeyDictionary();
+        d[null] = "null as map key";
+        d[new List<object> { "1", "2" }] = "Array as key to force cmap";
+
+        // Verify it writes as cmap (since null and array can't be string keys)
+        string json = WriteJson(d);
+        Assert.IsTrue(json.Contains("\"~#cmap\""), "Should encode as cmap");
+
+        // Roundtrip: read it back and verify entries
+        var result = Reader(json).Read<IDictionary>();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual("null as map key", result[null!]);
+    }
+
+    [TestMethod]
     public void TestWriteCache()
     {
         var wc = new WriteCache(true);
@@ -742,6 +799,158 @@ public class TransitTest
         var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
         var outObject = reader.Read<object>();
 
+        Assert.AreEqual(inObject, outObject);
+    }
+
+    [TestMethod]
+    public void TestWriteHandlerCache()
+    {
+        var customHandlers = new Dictionary<Type, IWriteHandler>
+        {
+            [typeof(IList<object>)] = new TestListWriteHandler()
+        };
+
+        // Creating multiple writers with the same handler map should not throw
+        for (int i = 0; i < 2; i++)
+        {
+            using var output = new MemoryStream();
+            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, customHandlers);
+        }
+    }
+
+    [TestMethod]
+    public void TestCustomWriteHandler()
+    {
+        var customHandlers = new Dictionary<Type, IWriteHandler>
+        {
+            [typeof(Point)] = new PointWriteHandler()
+        };
+        Assert.AreEqual("[\"~#point\",[37,42]]", WriteJson(new Point(37, 42), customHandlers));
+    }
+
+    [TestMethod]
+    public void TestWriteUnknownType()
+    {
+        // Writing an unregistered type should throw NotSupportedException
+        Assert.ThrowsException<NotSupportedException>(() => WriteJson(new Point(1, 2)));
+    }
+
+    private class TestListWriteHandler : IWriteHandler
+    {
+        public string Tag(object obj) => obj is List<object> ? "array" : "list";
+        public object Representation(object obj)
+        {
+            if (obj is LinkedList<object>)
+                return TransitFactory.TaggedValue("array", obj);
+            return obj;
+        }
+        public string? StringRepresentation(object obj) => null;
+        public IWriteHandler? GetVerboseHandler() => null;
+    }
+
+    private class PointWriteHandler : IWriteHandler
+    {
+        public string Tag(object obj) => "point";
+        public object Representation(object obj)
+        {
+            var p = (Point)obj;
+            return new List<object> { p.X, p.Y };
+        }
+        public string? StringRepresentation(object obj) => Representation(obj).ToString()!;
+        public IWriteHandler? GetVerboseHandler() => this;
+    }
+
+    #endregion
+
+    #region JSON Machine Mode
+
+    [TestMethod]
+    public void TestMachineReadMap()
+    {
+        var m = Reader("[\"^ \",\"foo\",1,\"bar\",2]").Read<IDictionary>();
+        Assert.IsTrue(m.Contains("foo"));
+        Assert.IsTrue(m.Contains("bar"));
+        Assert.AreEqual(1L, m["foo"]);
+        Assert.AreEqual(2L, m["bar"]);
+    }
+
+    [TestMethod]
+    public void TestMachineReadMapWithNested()
+    {
+        var m = Reader("[\"^ \",\"foo\",1,\"bar\",[\"^ \",\"baz\",3]]").Read<IDictionary>();
+        Assert.IsTrue(m["bar"] is IDictionary);
+        Assert.AreEqual(3L, ((IDictionary)m["bar"]!)["baz"]);
+    }
+
+    [TestMethod]
+    public void TestMachineWriteMap()
+    {
+        var m = new Dictionary<string, object> { ["foo"] = 1 };
+        Assert.AreEqual("[\"^ \",\"foo\",1]", WriteJson(m));
+
+        // Tighter test with preserved order
+        var m2 = new SortedDictionary<string, object> { ["bar"] = 2, ["foo"] = 1 };
+        Assert.AreEqual("[\"^ \",\"bar\",2,\"foo\",1]", WriteJson(m2));
+    }
+
+    [TestMethod]
+    public void TestMachineWriteEmptyMap()
+    {
+        var m = new Dictionary<string, object>();
+        Assert.AreEqual("[\"^ \"]", WriteJson(m));
+    }
+
+    [TestMethod]
+    public void TestMachineWritingArrayMarkerDirectly()
+    {
+        // If "^ " appears as an element, it must be escaped to "~^ " so it's not
+        // misinterpreted as a map marker when read back.
+        var l1 = new List<object> { "^ " };
+        var s = WriteJson(l1);
+        Assert.AreEqual("[\"~^ \"]", s);
+
+        // Round-trip: read it back and verify
+        var l2 = Reader(s).Read<IList<object>>();
+        Assert.AreEqual(1, l2.Count);
+        Assert.AreEqual("^ ", l2[0]);
+    }
+
+    [TestMethod]
+    public void TestMachineReadTime()
+    {
+        // Machine timestamps: ~m prefix
+        var human = Reader("[\"~t1776-07-04T12:00:00.000Z\",\"~t1970-01-01T00:00:00.000Z\",\"~t2000-01-01T12:00:00.000Z\",\"~t2014-04-07T22:17:17.000Z\"]")
+            .Read<IList<object>>();
+        var machine = Reader("[\"~m-6106017600000\",\"~m0\",\"~m946728000000\",\"~m1396909037000\"]")
+            .Read<IList<object>>();
+
+        Assert.AreEqual(4, human.Count);
+        Assert.AreEqual(4, machine.Count);
+
+        for (int i = 0; i < human.Count; i++)
+        {
+            var dh = (DateTime)human[i];
+            var dm = (DateTime)machine[i];
+            Assert.AreEqual(dh, dm, $"Mismatch at index {i}");
+        }
+    }
+
+    [TestMethod]
+    public void TestMachineRoundTrip()
+    {
+        object inObject = true;
+        string s;
+        using (var output = new MemoryStream())
+        {
+            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output);
+            w.Write(inObject);
+            output.Position = 0;
+            s = new StreamReader(output).ReadToEnd();
+        }
+
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes(s));
+        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
+        var outObject = reader.Read<object>();
         Assert.AreEqual(inObject, outObject);
     }
 

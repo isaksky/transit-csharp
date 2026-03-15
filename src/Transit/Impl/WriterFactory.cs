@@ -45,6 +45,7 @@ internal static class WriterFactory
             [typeof(IEnumerable)] = new EnumerableWriteHandler(),
             [typeof(IList<>)] = new ListWriteHandler(),
             [typeof(IDictionary<,>)] = new DictionaryWriteHandler(),
+            [typeof(NullKeyDictionary)] = new DictionaryWriteHandler(),
         };
         return dict.ToFrozenDictionary();
     }

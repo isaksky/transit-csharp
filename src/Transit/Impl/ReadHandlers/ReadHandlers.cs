@@ -180,10 +180,10 @@ internal sealed class CDictionaryReadHandler : IListReadHandler
         private object? _key;
         private bool _hasKey;
 
-        public object Init() => new Dictionary<object, object>();
+        public object Init() => new NullKeyDictionary();
         public object Add(object list, object item)
         {
-            var d = (Dictionary<object, object>)list;
+            var d = (NullKeyDictionary)list;
             if (!_hasKey)
             {
                 _key = item;
@@ -191,7 +191,7 @@ internal sealed class CDictionaryReadHandler : IListReadHandler
             }
             else
             {
-                d[_key!] = item;
+                d[_key] = item;
                 _hasKey = false;
             }
             return d;

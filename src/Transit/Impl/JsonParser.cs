@@ -114,13 +114,16 @@ internal sealed class JsonParser : AbstractParser
 
         var enumerator = element.EnumerateArray();
         enumerator.MoveNext();
-        var firstVal = ParseElement(enumerator.Current, false, cache);
 
-        if (firstVal is string s && s == Constants.DirectoryAsList)
+        // Check the RAW string for the map-as-array marker BEFORE parsing/unescaping.
+        // This prevents escaped values like "~^ " from being misidentified as the marker.
+        if (enumerator.Current.ValueKind == JsonValueKind.String
+            && enumerator.Current.GetString() == Constants.DirectoryAsList)
         {
-            // Build a map from the rest of the array
             return ParseArrayAsDict(enumerator, cache, null);
         }
+
+        var firstVal = ParseElement(enumerator.Current, false, cache);
 
         if (firstVal is Tag firstTag)
         {
