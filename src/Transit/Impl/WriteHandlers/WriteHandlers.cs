@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Transit.Impl.WriteHandlers;
 
 internal sealed class NullWriteHandler : AbstractWriteHandler
@@ -19,8 +21,8 @@ internal sealed class ToStringWriteHandler : AbstractWriteHandler
     private readonly string _tag;
     public ToStringWriteHandler(string tag) => _tag = tag;
     public override string Tag(object obj) => _tag;
-    public override object Representation(object obj) => obj.ToString()!;
-    public override string? StringRepresentation(object obj) => obj.ToString();
+    public override object Representation(object obj) => Convert.ToString(obj, CultureInfo.InvariantCulture)!;
+    public override string? StringRepresentation(object obj) => Convert.ToString(obj, CultureInfo.InvariantCulture);
 }
 
 internal sealed class IntegerWriteHandler : AbstractWriteHandler
@@ -29,7 +31,7 @@ internal sealed class IntegerWriteHandler : AbstractWriteHandler
     public IntegerWriteHandler(string tag) => _tag = tag;
     public override string Tag(object obj) => _tag;
     public override object Representation(object obj) => obj;
-    public override string? StringRepresentation(object obj) => obj.ToString();
+    public override string? StringRepresentation(object obj) => Convert.ToString(obj, CultureInfo.InvariantCulture);
 }
 
 internal sealed class FloatWriteHandler : AbstractWriteHandler
@@ -47,7 +49,7 @@ internal sealed class FloatWriteHandler : AbstractWriteHandler
         if (float.IsNegativeInfinity(f)) return "-INF";
         return obj;
     }
-    public override string? StringRepresentation(object obj) => Representation(obj).ToString();
+    public override string? StringRepresentation(object obj) => Convert.ToString(Representation(obj), CultureInfo.InvariantCulture);
 }
 
 internal sealed class DoubleWriteHandler : AbstractWriteHandler
@@ -65,7 +67,7 @@ internal sealed class DoubleWriteHandler : AbstractWriteHandler
         if (double.IsNegativeInfinity(d)) return "-INF";
         return obj;
     }
-    public override string? StringRepresentation(object obj) => Representation(obj).ToString();
+    public override string? StringRepresentation(object obj) => Convert.ToString(Representation(obj), CultureInfo.InvariantCulture);
 }
 
 internal sealed class BinaryWriteHandler : AbstractWriteHandler
@@ -88,14 +90,14 @@ internal sealed class DateTimeWriteHandler : AbstractWriteHandler
     {
         public override string Tag(object obj) => "t";
         public override object Representation(object obj) => AbstractParser.FormatDateTime((DateTime)obj);
-        public override string? StringRepresentation(object obj) => Representation(obj).ToString();
+        public override string? StringRepresentation(object obj) => Convert.ToString(Representation(obj), CultureInfo.InvariantCulture);
     }
 
     private static readonly IWriteHandler VerboseHandler = new VerboseDateTimeWriteHandler();
 
     public override string Tag(object obj) => "m";
     public override object Representation(object obj) => Transit.Java.Convert.ToJavaTime((DateTime)obj);
-    public override string? StringRepresentation(object obj) => Representation(obj).ToString();
+    public override string? StringRepresentation(object obj) => Convert.ToString(Representation(obj), CultureInfo.InvariantCulture);
     public override IWriteHandler? GetVerboseHandler() => VerboseHandler;
 }
 
@@ -127,18 +129,24 @@ internal sealed class RatioWriteHandler : AbstractWriteHandler
 
 internal sealed class LinkWriteHandler : AbstractWriteHandler
 {
+    private static readonly IKeyword HrefKeyword = TransitFactory.Keyword("href");
+    private static readonly IKeyword RelKeyword = TransitFactory.Keyword("rel");
+    private static readonly IKeyword NameKeyword = TransitFactory.Keyword("name");
+    private static readonly IKeyword PromptKeyword = TransitFactory.Keyword("prompt");
+    private static readonly IKeyword RenderKeyword = TransitFactory.Keyword("render");
+
     public override string Tag(object obj) => "link";
     public override object Representation(object obj)
     {
         var link = (ILink)obj;
         var d = new Dictionary<object, object>
         {
-            { TransitFactory.Keyword("href"), link.Href.ToString() },
-            { TransitFactory.Keyword("rel"), link.Rel },
+            { HrefKeyword, link.Href.ToString() },
+            { RelKeyword, link.Rel },
         };
-        if (link.Name != null) d[TransitFactory.Keyword("name")] = link.Name;
-        if (link.Prompt != null) d[TransitFactory.Keyword("prompt")] = link.Prompt;
-        if (link.Render != null) d[TransitFactory.Keyword("render")] = link.Render;
+        if (link.Name != null) d[NameKeyword] = link.Name;
+        if (link.Prompt != null) d[PromptKeyword] = link.Prompt;
+        if (link.Render != null) d[RenderKeyword] = link.Render;
         return TransitFactory.TaggedValue("map", d);
     }
 }
@@ -147,12 +155,7 @@ internal sealed class SetWriteHandler : AbstractWriteHandler
 {
     public override string Tag(object obj) => "set";
     public override object Representation(object obj)
-    {
-        var list = new List<object>();
-        foreach (var item in (System.Collections.IEnumerable)obj)
-            list.Add(item);
-        return TransitFactory.TaggedValue("array", list);
-    }
+        => TransitFactory.TaggedValue("array", obj);
 }
 
 internal sealed class ListWriteHandler : AbstractWriteHandler
@@ -165,17 +168,13 @@ internal sealed class EnumerableWriteHandler : AbstractWriteHandler
 {
     public override string Tag(object obj) => "list";
     public override object Representation(object obj)
-    {
-        var list = new List<object>();
-        foreach (var item in (System.Collections.IEnumerable)obj)
-            list.Add(item);
-        return TransitFactory.TaggedValue("array", list);
-    }
+        => TransitFactory.TaggedValue("array", obj);
 }
 
 internal sealed class DictionaryWriteHandler : AbstractWriteHandler, IAbstractEmitterAware
 {
     private AbstractEmitter? _emitter;
+    private bool? _lastStringableKeys;
 
     public void SetEmitter(AbstractEmitter emitter) => _emitter = emitter;
 
@@ -192,15 +191,22 @@ internal sealed class DictionaryWriteHandler : AbstractWriteHandler, IAbstractEm
         return true;
     }
 
-    public override string Tag(object obj) =>
-        StringableKeys((System.Collections.IDictionary)obj) ? "map" : "cmap";
+    public override string Tag(object obj)
+    {
+        _lastStringableKeys = StringableKeys((System.Collections.IDictionary)obj);
+        return _lastStringableKeys.Value ? "map" : "cmap";
+    }
 
     public override object Representation(object obj)
     {
         var dict = (System.Collections.IDictionary)obj;
-        if (StringableKeys(dict))
+        if (_lastStringableKeys ?? StringableKeys(dict))
+        {
+            _lastStringableKeys = null;
             return dict;
+        }
 
+        _lastStringableKeys = null;
         var list = new List<object>();
         foreach (System.Collections.DictionaryEntry entry in dict)
         {

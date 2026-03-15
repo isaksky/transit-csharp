@@ -142,6 +142,8 @@ internal static class ReaderFactory
 
         protected virtual IParser CreateParser()
             => throw new NotImplementedException();
+
+        public virtual void Dispose() { }
     }
 
     private sealed class JsonReader : Reader
@@ -153,14 +155,27 @@ internal static class ReaderFactory
 
         protected override IParser CreateParser()
         {
-            // Parse the entire stream into a JsonDocument
-            var doc = JsonDocument.Parse(Input, new JsonDocumentOptions
-            {
-                AllowTrailingCommas = true
-            });
+            // Read the entire stream into a contiguous byte buffer
+            var data = ReadStreamToBytes(Input);
 
-            return new JsonParser(doc.RootElement, HandlersDict, DefaultHandlerInst,
-                DictBuilder!, LstBuilder!);
+            return new JsonParser(new System.Buffers.ReadOnlySequence<byte>(data),
+                HandlersDict, DefaultHandlerInst, DictBuilder!, LstBuilder!);
+        }
+
+        private static byte[] ReadStreamToBytes(Stream stream)
+        {
+            if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
+            {
+                // Zero-copy path for MemoryStream
+                var buf = new byte[segment.Count];
+                Buffer.BlockCopy(segment.Array!, segment.Offset, buf, 0, segment.Count);
+                return buf;
+            }
+
+            // General path
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return buffer.ToArray();
         }
     }
 }

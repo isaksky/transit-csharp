@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Globalization;
 
 namespace Transit.Impl;
 
@@ -10,7 +11,7 @@ internal abstract class AbstractParser : IParser
     public static string FormatDateTime(DateTime value)
     {
         const string dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
-        return new DateTimeOffset(value).UtcDateTime.ToString(dateTimeFormat);
+        return new DateTimeOffset(value).UtcDateTime.ToString(dateTimeFormat, CultureInfo.InvariantCulture);
     }
 
     protected readonly FrozenDictionary<string, IReadHandler> Handlers;
@@ -44,6 +45,19 @@ internal abstract class AbstractParser : IParser
         throw new TransitException($"Cannot FromRepresentation {tag}: {representation}");
     }
 
+    // Pre-allocated single-char strings for tag lookup (printable ASCII '!' to '~')
+    private static readonly string[] SingleCharStrings = InitSingleCharStrings();
+    private static string[] InitSingleCharStrings()
+    {
+        var arr = new string[127];
+        for (int i = '!'; i <= '~'; i++)
+            arr[i] = ((char)i).ToString();
+        return arr;
+    }
+
+    private static string SingleCharString(char c)
+        => c < 127 ? SingleCharStrings[c] : c.ToString();
+
     internal object ParseString(object obj)
     {
         if (obj is string s && s.Length > 1)
@@ -56,11 +70,11 @@ internal abstract class AbstractParser : IParser
                         case Constants.Esc:
                         case Constants.Sub:
                         case Constants.Reserved:
-                            return s[1..]; // Span-style slicing
+                            return s[1..];
                         case Constants.Tag:
                             return new Tag(s[2..]);
                         default:
-                            var tag = s.Substring(1, 1);
+                            var tag = SingleCharString(s[1]);
                             var representation = s.Length > 2 ? s[2..] : string.Empty;
                             return Decode(tag, representation);
                     }

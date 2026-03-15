@@ -3,7 +3,7 @@ namespace Transit;
 /// <summary>
 /// Reads transit-encoded data.
 /// </summary>
-public interface IReader
+public interface IReader : IDisposable
 {
     /// <summary>
     /// Reads and returns a value.

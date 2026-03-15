@@ -33,8 +33,10 @@ internal sealed class NullKeyDictionary : IDictionary
     {
         get
         {
-            var keys = new List<object?>(_inner.Keys);
-            if (_hasNullKey) keys.Add(null);
+            if (!_hasNullKey) return _inner.Keys;
+            var keys = new List<object?>(_inner.Count + 1);
+            foreach (var k in _inner.Keys) keys.Add(k);
+            keys.Add(null);
             return keys;
         }
     }
@@ -43,8 +45,10 @@ internal sealed class NullKeyDictionary : IDictionary
     {
         get
         {
-            var values = new List<object?>(_inner.Values);
-            if (_hasNullKey) values.Add(_nullValue);
+            if (!_hasNullKey) return (ICollection)_inner.Values;
+            var values = new List<object?>(_inner.Count + 1);
+            foreach (var v in _inner.Values) values.Add(v);
+            values.Add(_nullValue);
             return values;
         }
     }

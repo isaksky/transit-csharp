@@ -1,27 +1,26 @@
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Text.Json;
 
 namespace Transit.Impl;
 
 /// <summary>
-/// JSON parser using System.Text.Json. Uses JsonDocument to parse the stream
-/// into a DOM, then walks the JsonElement tree. This avoids the complexity of
-/// managing the ref struct Utf8JsonReader across method boundaries while still
-/// getting the performance benefits of System.Text.Json's UTF-8 native parsing.
+/// JSON parser using System.Text.Json Utf8JsonReader for streaming, zero-allocation parsing.
+/// The Utf8JsonReader is a ref struct, so it is passed by ref through all parsing methods.
 /// </summary>
 internal sealed class JsonParser : AbstractParser
 {
-    private readonly JsonElement _root;
+    private readonly ReadOnlySequence<byte> _data;
 
     public JsonParser(
-        JsonElement root,
+        ReadOnlySequence<byte> data,
         FrozenDictionary<string, IReadHandler> handlers,
         IDefaultReadHandler<object>? defaultHandler,
         IDictionaryReader dictionaryBuilder,
         IListReader listBuilder)
         : base(handlers, defaultHandler, dictionaryBuilder, listBuilder)
     {
-        _root = root;
+        _data = data;
     }
 
     /// <summary>
@@ -31,115 +30,158 @@ internal sealed class JsonParser : AbstractParser
 
     public override object? Parse(ReadCache cache)
     {
-        return ParseElement(_root, false, cache);
+        var reader = new Utf8JsonReader(_data, new JsonReaderOptions
+        {
+            AllowTrailingCommas = true
+        });
+        reader.Read(); // Advance to first token
+        return ParseValue(ref reader, false, cache);
     }
 
     public override object? ParseVal(bool asDictionaryKey, ReadCache cache)
     {
-        return ParseElement(_root, asDictionaryKey, cache);
+        var reader = new Utf8JsonReader(_data, new JsonReaderOptions
+        {
+            AllowTrailingCommas = true
+        });
+        reader.Read();
+        return ParseValue(ref reader, asDictionaryKey, cache);
     }
 
-    private object? ParseElement(JsonElement element, bool asDictionaryKey, ReadCache cache)
+    private object? ParseValue(ref Utf8JsonReader reader, bool asDictionaryKey, ReadCache cache)
     {
-        return element.ValueKind switch
+        return reader.TokenType switch
         {
-            JsonValueKind.Number => ParseNumber(element),
-            JsonValueKind.String => cache.CacheRead(element.GetString()!, asDictionaryKey, this),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Array => ParseArrayElement(element, asDictionaryKey, cache, null),
-            JsonValueKind.Object => ParseObjectElement(element, asDictionaryKey, cache, null),
+            JsonTokenType.Number => ParseNumber(ref reader),
+            JsonTokenType.String => cache.CacheRead(reader.GetString()!, asDictionaryKey, this),
+            JsonTokenType.True => true,
+            JsonTokenType.False => false,
+            JsonTokenType.Null => null,
+            JsonTokenType.StartArray => ParseArray(ref reader, asDictionaryKey, cache, null),
+            JsonTokenType.StartObject => ParseObject(ref reader, false, cache, null),
             _ => null,
         };
     }
 
-    private static object ParseNumber(JsonElement element)
+    private static object ParseNumber(ref Utf8JsonReader reader)
     {
-        if (element.TryGetInt64(out var l))
+        if (reader.TryGetInt64(out var l))
             return l;
-        if (element.TryGetDouble(out var d))
+        if (reader.TryGetDouble(out var d))
             return d;
-        return element.GetDecimal();
+        return reader.GetDecimal();
     }
 
     public override object? ParseDictionary(bool ignored, ReadCache cache, IDictionaryReadHandler? handler)
     {
-        return ParseObjectElement(_root, ignored, cache, handler);
+        var reader = new Utf8JsonReader(_data, new JsonReaderOptions
+        {
+            AllowTrailingCommas = true
+        });
+        reader.Read();
+        return ParseObject(ref reader, ignored, cache, handler);
     }
 
-    private object? ParseObjectElement(JsonElement element, bool ignored, ReadCache cache, IDictionaryReadHandler? handler)
+    private object? ParseObject(ref Utf8JsonReader reader, bool ignored, ReadCache cache, IDictionaryReadHandler? handler)
     {
+        // reader.TokenType should be StartObject
         var dr = handler?.DictionaryReader() ?? DictionaryBuilder;
         var d = dr.Init();
 
-        foreach (var prop in element.EnumerateObject())
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
-            var key = cache.CacheRead(prop.Name, true, this);
+            // TokenType should be PropertyName
+            var propName = reader.GetString()!;
+            reader.Read(); // Advance to value
+
+            var key = cache.CacheRead(propName, true, this);
             if (key is Tag tag)
             {
                 var tagStr = tag.GetValue();
+                object? result;
                 if (TryGetHandler(tagStr, out var valHandler) && valHandler != null)
                 {
-                    if (prop.Value.ValueKind == JsonValueKind.Object && valHandler is IDictionaryReadHandler dictHandler)
-                        return ParseObjectElement(prop.Value, false, cache, dictHandler);
-                    if (prop.Value.ValueKind == JsonValueKind.Array && valHandler is IListReadHandler listHandler)
-                        return ParseArrayElement(prop.Value, false, cache, listHandler);
-                    return valHandler.FromRepresentation(ParseElement(prop.Value, false, cache)!);
+                    if (reader.TokenType == JsonTokenType.StartObject && valHandler is IDictionaryReadHandler dictHandler)
+                        result = ParseObject(ref reader, false, cache, dictHandler);
+                    else if (reader.TokenType == JsonTokenType.StartArray && valHandler is IListReadHandler listHandler)
+                        result = ParseArray(ref reader, false, cache, listHandler);
+                    else
+                        result = valHandler.FromRepresentation(ParseValue(ref reader, false, cache)!);
                 }
-                return Decode(tagStr, ParseElement(prop.Value, false, cache)!);
+                else
+                {
+                    result = Decode(tagStr, ParseValue(ref reader, false, cache)!);
+                }
+                // Consume the EndObject of this tagged-value object
+                SkipToEndObject(ref reader);
+                return result;
             }
             else
             {
-                d = dr.Add(d, key, ParseElement(prop.Value, false, cache)!);
+                d = dr.Add(d, key, ParseValue(ref reader, false, cache)!);
             }
         }
 
         return dr.Complete(d);
     }
 
-    public override object? ParseList(bool asDictionaryKey, ReadCache cache, IListReadHandler? handler)
+    private static void SkipToEndObject(ref Utf8JsonReader reader)
     {
-        return ParseArrayElement(_root, asDictionaryKey, cache, handler);
+        // The reader should be positioned just after the value inside a single-property object.
+        // Consume tokens until we hit the matching EndObject.
+        int depth = 1;
+        while (depth > 0 && reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.StartObject)
+                depth++;
+            else if (reader.TokenType == JsonTokenType.EndObject)
+                depth--;
+        }
     }
 
-    private object? ParseArrayElement(JsonElement element, bool asDictionaryKey, ReadCache cache, IListReadHandler? handler)
+    public override object? ParseList(bool asDictionaryKey, ReadCache cache, IListReadHandler? handler)
     {
-        int length = element.GetArrayLength();
-        if (length == 0)
+        var reader = new Utf8JsonReader(_data, new JsonReaderOptions
         {
+            AllowTrailingCommas = true
+        });
+        reader.Read();
+        return ParseArray(ref reader, asDictionaryKey, cache, handler);
+    }
+
+    private object? ParseArray(ref Utf8JsonReader reader, bool asDictionaryKey, ReadCache cache, IListReadHandler? handler)
+    {
+        // reader.TokenType should be StartArray
+        if (!reader.Read() || reader.TokenType == JsonTokenType.EndArray)
+        {
+            // Empty array
             var lr2 = handler?.ListReader() ?? ListBuilder;
             return lr2.Complete(lr2.Init());
         }
 
-        var enumerator = element.EnumerateArray();
-        enumerator.MoveNext();
-
-        // Check the RAW string for the map-as-array marker BEFORE parsing/unescaping.
-        // This prevents escaped values like "~^ " from being misidentified as the marker.
-        if (enumerator.Current.ValueKind == JsonValueKind.String
-            && enumerator.Current.GetString() == Constants.DirectoryAsList)
+        // Check the first element for the map-as-array marker
+        if (reader.TokenType == JsonTokenType.String
+            && reader.GetString() == Constants.DirectoryAsList)
         {
-            return ParseArrayAsDict(enumerator, cache, null);
+            return ParseArrayAsDict(ref reader, cache, null);
         }
 
-        var firstVal = ParseElement(enumerator.Current, false, cache);
+        var firstVal = ParseValue(ref reader, false, cache);
 
         if (firstVal is Tag firstTag)
         {
-            if (enumerator.MoveNext())
+            if (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
             {
                 var tagStr = firstTag.GetValue();
                 if (TryGetHandler(tagStr, out var valHandler) && valHandler != null)
                 {
-                    var valElement = enumerator.Current;
                     object? val;
-                    if (valElement.ValueKind == JsonValueKind.Object && valHandler is IDictionaryReadHandler dictHandler)
-                        val = ParseObjectElement(valElement, false, cache, dictHandler);
-                    else if (valElement.ValueKind == JsonValueKind.Array && valHandler is IDictionaryReadHandler dictHandler2)
+                    if (reader.TokenType == JsonTokenType.StartObject && valHandler is IDictionaryReadHandler dictHandler)
+                        val = ParseObject(ref reader, false, cache, dictHandler);
+                    else if (reader.TokenType == JsonTokenType.StartArray && valHandler is IDictionaryReadHandler dictHandler2)
                     {
-                        // Map-as-array encoding (["^ ", ...])  fed to a dict handler
-                        var parsed = ParseArrayElement(valElement, false, cache, null);
+                        // Map-as-array encoding (["^ ", ...]) fed to a dict handler
+                        var parsed = ParseArray(ref reader, false, cache, null);
                         if (parsed is System.Collections.IDictionary parsedDict)
                         {
                             var dr = dictHandler2.DictionaryReader();
@@ -153,14 +195,19 @@ internal sealed class JsonParser : AbstractParser
                             val = valHandler.FromRepresentation(parsed!);
                         }
                     }
-                    else if (valElement.ValueKind == JsonValueKind.Array && valHandler is IListReadHandler listHandler)
-                        val = ParseArrayElement(valElement, false, cache, listHandler);
+                    else if (reader.TokenType == JsonTokenType.StartArray && valHandler is IListReadHandler listHandler)
+                        val = ParseArray(ref reader, false, cache, listHandler);
                     else
-                        val = valHandler.FromRepresentation(ParseElement(valElement, false, cache)!);
+                        val = valHandler.FromRepresentation(ParseValue(ref reader, false, cache)!);
+
+                    // Skip remaining elements in the array (should just be EndArray)
+                    SkipToEndArray(ref reader);
                     return val;
                 }
 
-                return Decode(tagStr, ParseElement(enumerator.Current, false, cache)!);
+                var decoded = Decode(tagStr, ParseValue(ref reader, false, cache)!);
+                SkipToEndArray(ref reader);
+                return decoded;
             }
         }
 
@@ -168,53 +215,66 @@ internal sealed class JsonParser : AbstractParser
         var lr = handler?.ListReader() ?? ListBuilder;
         var l = lr.Init();
         l = lr.Add(l, firstVal!);
-        while (enumerator.MoveNext())
+
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
-            l = lr.Add(l, ParseElement(enumerator.Current, false, cache)!);
+            l = lr.Add(l, ParseValue(ref reader, false, cache)!);
         }
         return lr.Complete(l);
     }
 
-    private object? ParseArrayAsDict(JsonElement.ArrayEnumerator enumerator, ReadCache cache, IDictionaryReadHandler? handler)
+    private object? ParseArrayAsDict(ref Utf8JsonReader reader, ReadCache cache, IDictionaryReadHandler? handler)
     {
+        // We've already read the "^ " marker string. Now read key-value pairs.
         var dr = handler?.DictionaryReader() ?? DictionaryBuilder;
         var d = dr.Init();
 
-        while (enumerator.MoveNext())
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
-            var key = ParseElement(enumerator.Current, true, cache);
+            var key = ParseValue(ref reader, true, cache);
             if (key is Tag tag)
             {
-                if (enumerator.MoveNext())
+                if (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
                     var tagStr = tag.GetValue();
                     if (TryGetHandler(tagStr, out var valHandler) && valHandler != null)
                     {
-                        var valElement = enumerator.Current;
                         object? val;
-                        if (valElement.ValueKind == JsonValueKind.Object && valHandler is IDictionaryReadHandler dictHandler)
-                            val = ParseObjectElement(valElement, false, cache, dictHandler);
-                        else if (valElement.ValueKind == JsonValueKind.Array && valHandler is IListReadHandler listHandler)
-                            val = ParseArrayElement(valElement, false, cache, listHandler);
+                        if (reader.TokenType == JsonTokenType.StartObject && valHandler is IDictionaryReadHandler dictHandler)
+                            val = ParseObject(ref reader, false, cache, dictHandler);
+                        else if (reader.TokenType == JsonTokenType.StartArray && valHandler is IListReadHandler listHandler)
+                            val = ParseArray(ref reader, false, cache, listHandler);
                         else
-                            val = valHandler.FromRepresentation(ParseElement(valElement, false, cache)!);
+                            val = valHandler.FromRepresentation(ParseValue(ref reader, false, cache)!);
 
-                        // Read past end marker
-                        enumerator.MoveNext();
+                        // Skip to end of surrounding array
+                        SkipToEndArray(ref reader);
                         return val;
                     }
-                    return Decode(tagStr, ParseElement(enumerator.Current, false, cache)!);
+                    return Decode(tagStr, ParseValue(ref reader, false, cache)!);
                 }
             }
             else
             {
-                if (enumerator.MoveNext())
+                if (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
-                    d = dr.Add(d, key!, ParseElement(enumerator.Current, false, cache)!);
+                    d = dr.Add(d, key!, ParseValue(ref reader, false, cache)!);
                 }
             }
         }
 
         return dr.Complete(d);
+    }
+
+    private static void SkipToEndArray(ref Utf8JsonReader reader)
+    {
+        int depth = 1;
+        while (depth > 0 && reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.StartArray || reader.TokenType == JsonTokenType.StartObject)
+                depth++;
+            else if (reader.TokenType == JsonTokenType.EndArray || reader.TokenType == JsonTokenType.EndObject)
+                depth--;
+        }
     }
 }

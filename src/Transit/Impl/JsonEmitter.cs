@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Globalization;
 using System.Text.Json;
 
 namespace Transit.Impl;
@@ -51,7 +52,7 @@ internal class JsonEmitter : AbstractEmitter
     public override void EmitInteger(long i, bool asDictionaryKey, WriteCache cache)
     {
         if (asDictionaryKey || i > JsonIntMax || i < JsonIntMin)
-            EmitString(Constants.EscStr, "i", i.ToString(), asDictionaryKey, cache);
+            EmitString(Constants.EscStr, "i", i.ToString(CultureInfo.InvariantCulture), asDictionaryKey, cache);
         else
             JsonWriter.WriteNumberValue(i);
     }
@@ -66,7 +67,7 @@ internal class JsonEmitter : AbstractEmitter
     public override void EmitDouble(float d, bool asDictionaryKey, WriteCache cache)
     {
         if (asDictionaryKey)
-            EmitString(Constants.EscStr, "d", d.ToString(), asDictionaryKey, cache);
+            EmitString(Constants.EscStr, "d", d.ToString(CultureInfo.InvariantCulture), asDictionaryKey, cache);
         else
             JsonWriter.WriteNumberValue(d);
     }
@@ -74,7 +75,7 @@ internal class JsonEmitter : AbstractEmitter
     public override void EmitDouble(double d, bool asDictionaryKey, WriteCache cache)
     {
         if (asDictionaryKey)
-            EmitString(Constants.EscStr, "d", d.ToString(), asDictionaryKey, cache);
+            EmitString(Constants.EscStr, "d", d.ToString(CultureInfo.InvariantCulture), asDictionaryKey, cache);
         else
             JsonWriter.WriteNumberValue(d);
     }

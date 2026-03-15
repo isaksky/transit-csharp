@@ -50,6 +50,8 @@ internal sealed class ReadCache
 
     public ReadCache Init()
     {
+        if (_index > 0)
+            Array.Clear(_cache, 0, _index);
         _index = 0;
         return this;
     }

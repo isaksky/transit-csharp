@@ -91,7 +91,11 @@ internal abstract class AbstractEmitter : IEmitter
         {
             char c = s[0];
             if (c == Constants.Esc || c == Constants.Sub || c == Constants.Reserved)
-                return Constants.Esc + s;
+                return string.Create(s.Length + 1, s, static (span, src) =>
+                {
+                    span[0] = Constants.Esc;
+                    src.AsSpan().CopyTo(span[1..]);
+                });
         }
         return s;
     }
@@ -223,8 +227,6 @@ internal abstract class AbstractEmitter : IEmitter
             else
                 EmitEncoded(t, h, o!, asDictionaryKey, cache);
         }
-
-        FlushWriter();
     }
 
     protected void MarshalTop(object? obj, WriteCache cache)
