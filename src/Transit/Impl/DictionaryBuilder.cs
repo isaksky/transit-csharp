@@ -5,11 +5,11 @@ namespace Transit.Impl;
 /// </summary>
 internal sealed class DictionaryBuilder : IDictionaryReader
 {
-    public object Init() => new Dictionary<object, object>();
+    public object Init() => new NullKeyDictionary();
 
     public object Add(object dictionary, object key, object value)
     {
-        ((Dictionary<object, object>)dictionary)[key] = value;
+        ((System.Collections.IDictionary)dictionary)[key] = value;
         return dictionary;
     }
 

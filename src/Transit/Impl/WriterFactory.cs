@@ -28,6 +28,8 @@ internal static class WriterFactory
             [typeof(short)] = integerHandler,
             [typeof(byte)] = integerHandler,
             [typeof(BigInteger)] = new ToStringWriteHandler("n"),
+            [typeof(decimal)] = new ToStringWriteHandler("f"),
+            [typeof(BigRational)] = new ToStringWriteHandler("f"),
             [typeof(float)] = new FloatWriteHandler(),
             [typeof(double)] = new DoubleWriteHandler(),
             [typeof(char)] = new ToStringWriteHandler("c"),

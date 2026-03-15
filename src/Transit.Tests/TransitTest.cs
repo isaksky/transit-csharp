@@ -558,6 +558,24 @@ public class TransitTest
     }
 
     [TestMethod]
+    public void TestWriteBigRational()
+    {
+        Assert.AreEqual(ScalarVerbose("\"~f12.345\""), WriteJsonVerbose(new BigRational(12.345M)));
+        Assert.AreEqual(ScalarVerbose("\"~f-12.345\""), WriteJsonVerbose(new BigRational(-12.345M)));
+        Assert.AreEqual(ScalarVerbose("\"~f420.0057\""), WriteJsonVerbose(new BigRational(420.0057M)));
+        Assert.AreEqual(Scalar("\"~f12.345\""), WriteJson(new BigRational(12.345M)));
+    }
+
+    [TestMethod]
+    public void TestWriteDecimal()
+    {
+        Assert.AreEqual(ScalarVerbose("\"~f12.345\""), WriteJsonVerbose(12.345M));
+        Assert.AreEqual(ScalarVerbose("\"~f-12.345\""), WriteJsonVerbose(-12.345M));
+        Assert.AreEqual(ScalarVerbose("\"~f420.0057\""), WriteJsonVerbose(420.0057M));
+        Assert.AreEqual(Scalar("\"~f12.345\""), WriteJson(12.345M));
+    }
+
+    [TestMethod]
     public void TestSpecialNumbers()
     {
         Assert.AreEqual(Scalar("\"~zNaN\""), WriteJson(double.NaN));
@@ -1103,6 +1121,196 @@ public class TransitTest
     {
         string str = WriteJson(new HashSet<object>());
         Assert.IsInstanceOfType<ISet<object>>(Reader(str).Read<ISet<object>>());
+    }
+
+    [TestMethod]
+    public void TestBooleanVerification()
+    {
+        // Verify true/false roundtrip
+        Assert.AreEqual(true, Reader(WriteJson(true)).Read<bool>());
+        Assert.AreEqual(false, Reader(WriteJson(false)).Read<bool>());
+        Assert.AreEqual(true, Reader(WriteJsonVerbose(true)).Read<bool>());
+        Assert.AreEqual(false, Reader(WriteJsonVerbose(false)).Read<bool>());
+
+        // Verify booleans as map keys encode as ~?t/~?f and decode back
+        var dict = new Dictionary<bool, string> { { true, "t" }, { false, "f" } };
+        string json = WriteJson(dict);
+        Assert.IsTrue(json.Contains("\"~?t\""));
+        Assert.IsTrue(json.Contains("\"~?f\""));
+        var readDict = Reader(json).Read<IDictionary>();
+        Assert.AreEqual("t", readDict[true]);
+        Assert.AreEqual("f", readDict[false]);
+    }
+
+    [TestMethod]
+    public void TestNullVerification()
+    {
+        // Verify null roundtrips
+        Assert.IsNull(Reader(WriteJson(null)).Read<object>());
+        Assert.IsNull(Reader(WriteJsonVerbose(null)).Read<object>());
+
+        // Verify null in arrays
+        var list = new List<object?> { 1L, null, 3L };
+        var readList = Reader(WriteJson(list)).Read<IList>();
+        Assert.AreEqual(1L, readList[0]);
+        Assert.IsNull(readList[1]);
+        Assert.AreEqual(3L, readList[2]);
+
+        // Verify null in both key and value positions of maps
+        var dict = new Transit.Impl.NullKeyDictionary();
+        dict[null] = null;
+        var encoded = WriteJson(dict);
+        var readDict = Reader(encoded).Read<IDictionary>();
+        Assert.IsTrue(readDict.Contains(null!));
+        Assert.IsNull(readDict[null!]);
+    }
+
+    [TestMethod]
+    public void TestNullRoundtripAndEncoding()
+    {
+        // 1. Verify null roundtrips correctly in JSON and JSON-Verbose
+        Assert.IsNull(Reader(WriteJson(null)).Read<object>());
+        Assert.IsNull(Reader(WriteJsonVerbose(null)).Read<object>());
+
+        // 2. Check ~_ string decoding (must not be confused with null)
+        Assert.AreEqual("~_", Reader("\"~~_\"").Read<string>());
+
+        // 3. Verify null in arrays
+        var listWithNull = new List<object?> { 1L, null, 3L };
+        var lJson = WriteJson(listWithNull);
+        var rList = Reader(lJson).Read<IList>();
+        Assert.AreEqual(3, rList.Count);
+        Assert.AreEqual(1L, rList[0]);
+        Assert.IsNull(rList[1]);
+        Assert.AreEqual(3L, rList[2]);
+
+        // 4. Verify null in both key and value positions of maps
+        // We use Transit.Impl.NullKeyDictionary since standard Dictionary throws on null key
+        var mapWithNull = new Transit.Impl.NullKeyDictionary();
+        mapWithNull[null] = "null value";
+        mapWithNull["null key"] = null;
+
+        var mJson = WriteJson(mapWithNull);
+        var rMap = Reader(mJson).Read<IDictionary>();
+        Assert.IsTrue(rMap.Contains(null!));
+        Assert.AreEqual("null value", rMap[null!]);
+        Assert.IsTrue(rMap.Contains("null key"));
+        Assert.IsNull(rMap["null key"]);
+
+        // 5. Null as map key must encode as ~_
+        // JSON Verbose output should have "~_" as the key
+        var mJsonVerbose = WriteJsonVerbose(mapWithNull);
+        Assert.IsTrue(mJsonVerbose.Contains("\"~_\""), "Null key should encode as ~_");
+    }
+
+    [TestMethod]
+    public void TestJsonVsJsonVerboseConsistency()
+    {
+        var data = new Dictionary<string, object>
+        {
+            ["int"] = 42L,
+            ["str"] = "hello",
+            ["list"] = new List<object> { 1L, 2L, 3L },
+            ["map"] = new Dictionary<string, object> { ["nested"] = true }
+        };
+
+        var json = WriteJson(data);
+        var jsonVerbose = WriteJsonVerbose(data);
+
+        // Verify map representation differs (JSON mode uses array with ^ , Verbose uses {} object)
+        Assert.IsTrue(json.StartsWith("[\"^ \"") || json.Contains("\"^ \""), "JSON mode should use array maps with ^ marker");
+        Assert.IsTrue(jsonVerbose.StartsWith("{"), "JSON-Verbose mode should use object maps");
+        Assert.AreNotEqual(json, jsonVerbose);
+
+        // Verify that data written in JSON mode can be read back correctly
+        // and reader transparently handles both modes.
+        var readJson = Reader(json).Read<IDictionary>();
+        var readVerbose = Reader(jsonVerbose).Read<IDictionary>();
+
+        // Assert they produce the same values
+        Assert.AreEqual(42L, readJson["int"]);
+        Assert.AreEqual(42L, readVerbose["int"]);
+        
+        Assert.AreEqual("hello", readJson["str"]);
+        Assert.AreEqual("hello", readVerbose["str"]);
+        
+        var list1 = (IList)readJson["list"]!;
+        var list2 = (IList)readVerbose["list"]!;
+        Assert.AreEqual(3, list1.Count);
+        Assert.AreEqual(list1.Count, list2.Count);
+
+        var map1 = (IDictionary)readJson["map"]!;
+        var map2 = (IDictionary)readVerbose["map"]!;
+        Assert.IsTrue((bool)map1["nested"]!);
+        Assert.IsTrue((bool)map2["nested"]!);
+    }
+
+    [TestMethod]
+    public void TestVerifyBoolean()
+    {
+        // JSON Verbose true/false
+        Assert.AreEqual(ScalarVerbose("true"), WriteJsonVerbose(true));
+        Assert.AreEqual(ScalarVerbose("false"), WriteJsonVerbose(false));
+
+        // JSON true/false
+        Assert.AreEqual(Scalar("true"), WriteJson(true));
+        Assert.AreEqual(Scalar("false"), WriteJson(false));
+
+        // Reading native JSON
+        Assert.IsTrue(Reader("true").Read<bool>());
+        Assert.IsFalse(Reader("false").Read<bool>());
+
+        // Tagged string forms
+        Assert.IsTrue(Reader("\"~?t\"").Read<bool>());
+        Assert.IsFalse(Reader("\"~?f\"").Read<bool>());
+
+        // Map keys
+        var d = new Dictionary<bool, int> { [true] = 1, [false] = 2 };
+        var jsonVerbose = WriteJsonVerbose(d);
+        Assert.IsTrue(jsonVerbose.Contains("\"~?t\":1") || jsonVerbose.Contains("\"~?t\": 1"), "true as map key must encode as ~?t");
+        Assert.IsTrue(jsonVerbose.Contains("\"~?f\":2") || jsonVerbose.Contains("\"~?f\": 2"), "false as map key must encode as ~?f");
+
+        var readMap = Reader(jsonVerbose).Read<IDictionary>();
+        Assert.AreEqual(1L, readMap[true]);
+        Assert.AreEqual(2L, readMap[false]);
+    }
+
+    [TestMethod]
+    public void TestVerifyNull()
+    {
+        // Roundtrip null
+        Assert.AreEqual(ScalarVerbose("null"), WriteJsonVerbose(null));
+        Assert.AreEqual(Scalar("null"), WriteJson(null));
+
+        // Read null
+        Assert.IsNull(Reader("null").Read<object>());
+        Assert.IsNull(Reader("\"~_\"").Read<object>());
+
+        // Null in arrays
+        var arr = new object?[] { 1L, null, 2L };
+        var arrVerbose = WriteJsonVerbose(arr);
+        Assert.AreEqual("[1,null,2]", arrVerbose.Replace(" ", ""));
+        var readArr = Reader(arrVerbose).Read<IList>();
+        Assert.AreEqual(1L, readArr[0]);
+        Assert.IsNull(readArr[1]);
+        Assert.AreEqual(2L, readArr[2]);
+
+        // Null in map values
+        var mapVal = new Dictionary<string, object?> { ["a"] = null };
+        var mapValVerbose = WriteJsonVerbose(mapVal);
+        Assert.IsTrue(mapValVerbose.Contains("\"a\":null") || mapValVerbose.Contains("\"a\": null"));
+        var readMapVal = Reader(mapValVerbose).Read<IDictionary>();
+        Assert.IsNull(readMapVal["a"]);
+
+        // Null as map key
+        var mapKey = new Transit.Impl.NullKeyDictionary();
+        mapKey[null] = "value";
+        string json = WriteJson(mapKey);
+        // By spec, null key should encode as ~_
+        Assert.IsTrue(json.Contains("\"~_\""), "Null key should encode as ~_");
+
+        var readMapKey = Reader(json).Read<IDictionary>();
+        Assert.AreEqual("value", readMapKey[null!]);
     }
 
     #endregion
