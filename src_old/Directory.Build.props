@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>/tmp/transit-old-obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>/tmp/transit-old-obj/$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
+    <OutputPath>/tmp/transit-old-bin/$(MSBuildProjectName)/</OutputPath>
+  </PropertyGroup>
+</Project>
