@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>Transit.Benchmarks.WriteBenchmarks-20260315-131828</title>
+<title>Transit.Benchmarks.WriteBenchmarks-20260315-175227</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,20 +16,19 @@
 BenchmarkDotNet v0.13.12, macOS 15.7.4 (24G517) [Darwin 24.6.0]
 Apple M3 Ultra, 1 CPU, 28 logical and 28 physical cores
 .NET SDK 10.0.103
-  [Host]   : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
-  ShortRun : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
+  [Host] : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
 </code></pre>
-<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+<pre><code>Job=ShortRun  Toolchain=InProcessNoEmitToolchain  IterationCount=3  
+LaunchCount=1  WarmupCount=3  
 </code></pre>
 
 <table>
-<thead><tr><th>Method           </th><th>Mean   </th><th>Error</th><th>StdDev</th><th>Median </th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method               </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>OldTransit_WriteJson</td><td>2,798.8673 ns</td><td>277.4382 ns</td><td>15.2073 ns</td><td>2,791.2215 ns</td><td>1.000</td><td>0.00</td><td>1.0071</td><td>0.0076</td><td>8442 B</td><td>1.00</td>
-</tr><tr><td>NewTransit_WriteJson</td><td>0.0042 ns</td><td>0.0077 ns</td><td>0.0004 ns</td><td>0.0043 ns</td><td>0.000</td><td>0.00</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
-</tr><tr><td>OldTransit_WriteMsgPack</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>?</td><td>NA</td><td>NA</td><td>NA</td><td>?</td>
-</tr><tr><td>NewTransit_WriteMsgPack</td><td>0.0016 ns</td><td>0.0520 ns</td><td>0.0029 ns</td><td>0.0000 ns</td><td>0.000</td><td>0.00</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</thead><tbody><tr><td>OldTransit_WriteJson</td><td>2.726 &mu;s</td><td>0.1624 &mu;s</td><td>0.0089 &mu;s</td><td>1.00</td><td>1.0071</td><td>0.0076</td><td>8.24 KB</td><td>1.00</td>
+</tr><tr><td>NewTransit_WriteJson</td><td>2.161 &mu;s</td><td>0.1437 &mu;s</td><td>0.0079 &mu;s</td><td>0.79</td><td>8.1940</td><td>0.7820</td><td>67.13 KB</td><td>8.14</td>
+</tr><tr><td>OldTransit_WriteJsonVerbose</td><td>4.337 &mu;s</td><td>0.1549 &mu;s</td><td>0.0085 &mu;s</td><td>1.59</td><td>1.1826</td><td>0.0229</td><td>9.7 KB</td><td>1.18</td>
+</tr><tr><td>NewTransit_WriteJsonVerbose</td><td>1.741 &mu;s</td><td>0.0431 &mu;s</td><td>0.0024 &mu;s</td><td>0.64</td><td>0.7915</td><td>0.0172</td><td>6.48 KB</td><td>0.79</td>
 </tr></tbody></table>
 </body>
 </html>

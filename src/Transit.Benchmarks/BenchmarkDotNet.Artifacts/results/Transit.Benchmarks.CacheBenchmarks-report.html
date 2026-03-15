@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>Transit.Benchmarks.CacheBenchmarks-20260315-131718</title>
+<title>Transit.Benchmarks.CacheBenchmarks-20260315-175134</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,20 +16,19 @@
 BenchmarkDotNet v0.13.12, macOS 15.7.4 (24G517) [Darwin 24.6.0]
 Apple M3 Ultra, 1 CPU, 28 logical and 28 physical cores
 .NET SDK 10.0.103
-  [Host]   : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
-  ShortRun : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
+  [Host] : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
 </code></pre>
-<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+<pre><code>Job=ShortRun  Toolchain=InProcessNoEmitToolchain  IterationCount=3  
+LaunchCount=1  WarmupCount=3  
 </code></pre>
 
 <table>
-<thead><tr><th>Method         </th><th>Mean     </th><th>Error    </th><th>StdDev </th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method         </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>OldTransit_WriteCache</td><td>583,161.6348 ns</td><td>55,749.5508 ns</td><td>3,055.8210 ns</td><td>1.000</td><td>160.1563</td><td>73.2422</td><td>1343953 B</td><td>1.00</td>
-</tr><tr><td>NewTransit_WriteCache</td><td>0.0000 ns</td><td>0.0000 ns</td><td>0.0000 ns</td><td>0.000</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
-</tr><tr><td>OldTransit_ReadCache</td><td>450,056.3083 ns</td><td>136,974.4740 ns</td><td>7,508.0331 ns</td><td>0.772</td><td>144.0430</td><td>47.8516</td><td>1206288 B</td><td>0.90</td>
-</tr><tr><td>NewTransit_ReadCache</td><td>0.0000 ns</td><td>0.0000 ns</td><td>0.0000 ns</td><td>0.000</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</thead><tbody><tr><td>OldTransit_WriteCache</td><td>594.6 &mu;s</td><td>46.16 &mu;s</td><td>2.53 &mu;s</td><td>1.00</td><td>160.1563</td><td>74.2188</td><td>-</td><td>1312.59 KB</td><td>1.00</td>
+</tr><tr><td>NewTransit_WriteCache</td><td>337.2 &mu;s</td><td>19.79 &mu;s</td><td>1.08 &mu;s</td><td>0.57</td><td>122.0703</td><td>53.7109</td><td>-</td><td>999.11 KB</td><td>0.76</td>
+</tr><tr><td>OldTransit_ReadCache</td><td>511.7 &mu;s</td><td>50.92 &mu;s</td><td>2.79 &mu;s</td><td>0.86</td><td>151.3672</td><td>28.3203</td><td>2.9297</td><td>1240.53 KB</td><td>0.95</td>
+</tr><tr><td>NewTransit_ReadCache</td><td>227.2 &mu;s</td><td>55.54 &mu;s</td><td>3.04 &mu;s</td><td>0.38</td><td>75.4395</td><td>30.0293</td><td>1.7090</td><td>618.73 KB</td><td>0.47</td>
 </tr></tbody></table>
 </body>
 </html>

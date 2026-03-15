@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>Transit.Benchmarks.ReadBenchmarks-20260315-140339</title>
+<title>Transit.Benchmarks.ReadBenchmarks-20260315-175158</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,16 +16,19 @@
 BenchmarkDotNet v0.13.12, macOS 15.7.4 (24G517) [Darwin 24.6.0]
 Apple M3 Ultra, 1 CPU, 28 logical and 28 physical cores
 .NET SDK 10.0.103
-  [Host]     : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
-  DefaultJob : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
+  [Host] : .NET 10.0.3 (10.0.326.7603), Arm64 RyuJIT AdvSIMD
 </code></pre>
-<pre><code></code></pre>
+<pre><code>Job=ShortRun  Toolchain=InProcessNoEmitToolchain  IterationCount=3  
+LaunchCount=1  WarmupCount=3  
+</code></pre>
 
 <table>
-<thead><tr><th>Method       </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method              </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>OldTransit_ReadJson</td><td>1,808.5 ns</td><td>6.61 ns</td><td>5.16 ns</td><td>1.00</td><td>2.9316</td><td>0.2251</td><td>23.99 KB</td><td>1.00</td>
-</tr><tr><td>NewTransit_ReadJson</td><td>626.2 ns</td><td>8.43 ns</td><td>7.47 ns</td><td>0.35</td><td>1.9646</td><td>0.1087</td><td>16.09 KB</td><td>0.67</td>
+</thead><tbody><tr><td>OldTransit_ReadJson</td><td>1,914.1 ns</td><td>109.73 ns</td><td>6.01 ns</td><td>1.00</td><td>2.9316</td><td>0.2251</td><td>23.99 KB</td><td>1.00</td>
+</tr><tr><td>NewTransit_ReadJson</td><td>602.3 ns</td><td>110.50 ns</td><td>6.06 ns</td><td>0.31</td><td>1.9798</td><td>0.0610</td><td>16.21 KB</td><td>0.68</td>
+</tr><tr><td>OldTransit_ReadJsonVerbose</td><td>1,903.3 ns</td><td>306.38 ns</td><td>16.79 ns</td><td>0.99</td><td>2.9316</td><td>0.2251</td><td>23.99 KB</td><td>1.00</td>
+</tr><tr><td>NewTransit_ReadJsonVerbose</td><td>599.6 ns</td><td>31.76 ns</td><td>1.74 ns</td><td>0.31</td><td>1.9798</td><td>0.0610</td><td>16.21 KB</td><td>0.68</td>
 </tr></tbody></table>
 </body>
 </html>
