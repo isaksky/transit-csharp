@@ -349,6 +349,53 @@ public class TransitTest
         Assert.AreEqual("link or image", v.Render);
     }
 
+    [TestMethod]
+    public void TestCustomReadHandler()
+    {
+        var customHandlers = new Dictionary<string, IReadHandler>
+        {
+            ["point"] = new PointReadHandler()
+        };
+        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[37,42]]"));
+        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, customHandlers, null);
+        var result = reader.Read<Point>();
+        Assert.AreEqual(new Point(37, 42), result);
+    }
+
+    [TestMethod]
+    public void TestCustomDefaultReadHandler()
+    {
+        var defaultHandler = new CatchAllDefaultReadHandler();
+        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#unknown\",[37,42]]"));
+        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, defaultHandler);
+        var result = reader.Read<string>();
+        Assert.AreEqual("unknown: [37, 42]", result);
+    }
+
+    private record Point(int X, int Y);
+
+    private class PointReadHandler : IReadHandler
+    {
+        public object FromRepresentation(object representation)
+        {
+            var coords = (IList<object>)representation;
+            int x = System.Convert.ToInt32(coords[0]);
+            int y = System.Convert.ToInt32(coords[1]);
+            return new Point(x, y);
+        }
+    }
+
+    private class CatchAllDefaultReadHandler : IDefaultReadHandler<object>
+    {
+        public object FromRepresentation(string tag, object representation)
+        {
+            // Format collections like Java's ArrayList.toString() for consistent output
+            if (representation is IList<object> list)
+                return $"{tag}: [{string.Join(", ", list)}]";
+            return $"{tag}: {representation}";
+        }
+    }
+
     #endregion
 
     #region Writing
