@@ -217,3 +217,7 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
