@@ -12,6 +12,8 @@ internal sealed class WriteCache
     public const int BaseCharIdx = 48;
 
     private Dictionary<string, string>? _cache;
+    //private Dictionary<string, string> Cache => _cache ??= new Dictionary<string, string>(MaxCacheEntries);
+    private Dictionary<string, string> Cache => _cache ??= new Dictionary<string, string>();
     private int _index;
     private readonly bool _enabled;
 
@@ -21,8 +23,6 @@ internal sealed class WriteCache
     {
         _enabled = enabled;
         _index = 0;
-        if (enabled)
-            _cache = new Dictionary<string, string>(MaxCacheEntries);
     }
 
     public static bool IsCacheable(string s, bool asDictionaryKey)
@@ -56,13 +56,13 @@ internal sealed class WriteCache
     {
         if (_enabled && IsCacheable(s, asDictionaryKey))
         {
-            if (_cache!.TryGetValue(s, out var val))
+            if (Cache.TryGetValue(s, out var val))
                 return val;
 
             if (_index == MaxCacheEntries)
                 Init();
 
-            _cache[s] = IndexToCode(_index++);
+            Cache[s] = IndexToCode(_index++);
         }
 
         return s;
