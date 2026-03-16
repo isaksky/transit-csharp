@@ -40,7 +40,7 @@ public class WriteBenchmarks
     public byte[] NewTransit_WriteJson()
     {
         using var ms = new MemoryStream();
-        var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms);
+        using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms, ownsStream: false);
         writer.Write(_dataPayload);
         return ms.ToArray();
     }
@@ -58,7 +58,7 @@ public class WriteBenchmarks
     public byte[] NewTransit_WriteJsonVerbose()
     {
         using var ms = new MemoryStream();
-        var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.JsonVerbose, ms);
+        using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.JsonVerbose, ms, ownsStream: false);
         writer.Write(_dataPayload);
         return ms.ToArray();
     }

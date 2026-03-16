@@ -372,8 +372,8 @@ public class TransitTest
     [TestMethod]
     public void TestReadWithNoCustomHandlers()
     {
-        var input = new MemoryStream(Encoding.UTF8.GetBytes("\"foo\""));
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, null);
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes("\"foo\""));
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, null);
         Assert.AreEqual("foo", reader.Read<string>());
     }
 
@@ -396,8 +396,8 @@ public class TransitTest
         {
             ["point"] = new PointReadHandler()
         };
-        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[37,42]]"));
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, customHandlers, null);
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[37,42]]"));
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, customHandlers, null);
         var result = reader.Read<Point>();
         Assert.AreEqual(new Point(37, 42), result);
     }
@@ -406,8 +406,8 @@ public class TransitTest
     public void TestCustomDefaultReadHandler()
     {
         var defaultHandler = new CatchAllDefaultReadHandler();
-        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#unknown\",[37,42]]"));
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, defaultHandler);
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#unknown\",[37,42]]"));
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, null, defaultHandler);
         var result = reader.Read<string>();
         Assert.AreEqual("unknown: [37, 42]", result);
     }
@@ -443,11 +443,11 @@ public class TransitTest
     private string Write(object? obj, TransitFactory.Format format, IDictionary<Type, IWriteHandler>? customHandlers)
     {
         using var output = new MemoryStream();
-        var w = TransitFactory.Writer<object>(format, output, customHandlers);
+        using var w = TransitFactory.Writer<object>(format, output, customHandlers);
         w.Write(obj!);
 
         output.Position = 0;
-        var sr = new StreamReader(output);
+        using var sr = new StreamReader(output, leaveOpen: true);
         return sr.ReadToEnd();
     }
 
@@ -752,7 +752,8 @@ public class TransitTest
         Assert.IsTrue(json.Contains("\"~#cmap\""), "Should encode as cmap");
 
         // Roundtrip: read it back and verify entries
-        var result = Reader(json).Read<IDictionary>();
+        using var resultReader = Reader(json);
+        var result = resultReader.Read<IDictionary>();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("null as map key", result[null!]);
     }
@@ -806,15 +807,16 @@ public class TransitTest
         string s;
         using (var output = new MemoryStream())
         {
-            var w = TransitFactory.Writer<object>(TransitFactory.Format.JsonVerbose, output);
+            using var w = TransitFactory.Writer<object>(TransitFactory.Format.JsonVerbose, output);
             w.Write(inObject);
             output.Position = 0;
-            s = new StreamReader(output).ReadToEnd();
+            using var sr = new StreamReader(output, leaveOpen: true);
+            s = sr.ReadToEnd();
         }
 
         byte[] buffer = Encoding.ASCII.GetBytes(s);
         using var input = new MemoryStream(buffer);
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
         var outObject = reader.Read<object>();
 
         Assert.AreEqual(inObject, outObject);
@@ -832,7 +834,7 @@ public class TransitTest
         for (int i = 0; i < 2; i++)
         {
             using var output = new MemoryStream();
-            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, customHandlers);
+            using var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, customHandlers);
         }
     }
 
@@ -960,14 +962,15 @@ public class TransitTest
         string s;
         using (var output = new MemoryStream())
         {
-            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output);
+            using var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output);
             w.Write(inObject);
             output.Position = 0;
-            s = new StreamReader(output).ReadToEnd();
+            using var sr = new StreamReader(output, leaveOpen: true);
+            s = sr.ReadToEnd();
         }
 
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(s));
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
         var outObject = reader.Read<object>();
         Assert.AreEqual(inObject, outObject);
     }
@@ -2007,15 +2010,15 @@ public class TransitTest
         {
             ["point"] = new PointReadHandler()
         };
-        var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[10,20]]"));
-        var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, handlers, null);
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#point\",[10,20]]"));
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input, handlers, null);
         var point = reader.Read<Point>();
         Assert.AreEqual(new Point(10, 20), point);
 
         // Default handler catches unrecognized tags
         var defaultHandler = new CatchAllDefaultReadHandler();
-        var input2 = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#widget\",[1,2,3]]"));
-        var reader2 = TransitFactory.Reader(TransitFactory.Format.Json, input2, null, defaultHandler);
+        using var input2 = new MemoryStream(Encoding.UTF8.GetBytes("[\"~#widget\",[1,2,3]]"));
+        using var reader2 = TransitFactory.Reader(TransitFactory.Format.Json, input2, null, defaultHandler);
         var result = reader2.Read<string>();
         Assert.IsTrue(result.Contains("widget"));
     }
@@ -2040,10 +2043,11 @@ public class TransitTest
         for (int i = 0; i < 3; i++)
         {
             using var output = new MemoryStream();
-            var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, handlers);
+            using var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, handlers);
             w.Write(new Point(i, i));
             output.Position = 0;
-            var json2 = new StreamReader(output).ReadToEnd();
+            using var sr = new StreamReader(output, leaveOpen: true);
+            var json2 = sr.ReadToEnd();
             Assert.IsTrue(json2.Contains($"[{i},{i}]"));
         }
     }
@@ -2122,8 +2126,9 @@ public class TransitTest
         bool threw = false;
         try
         {
-            var input = new MemoryStream(Array.Empty<byte>());
-            TransitFactory.Reader(TransitFactory.Format.Json, input).Read<object>();
+            using var input = new MemoryStream(Array.Empty<byte>());
+            using var reader = TransitFactory.Reader(TransitFactory.Format.Json, input);
+            reader.Read<object>();
         }
         catch (Exception ex) when (ex.GetType().Name.Contains("Json"))
         {

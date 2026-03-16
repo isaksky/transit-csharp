@@ -35,7 +35,7 @@ public class CacheBenchmarks
 
         using (var ms = new MemoryStream())
         {
-            var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms);
+            using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms, ownsStream: false);
             writer.Write(list);
             _newJsonWithCaching = ms.ToArray();
         }
@@ -72,7 +72,7 @@ public class CacheBenchmarks
             });
         }
         using var ms = new MemoryStream();
-        var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms);
+        using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms, ownsStream: false);
         writer.Write(list);
         return ms.ToArray();
     }
@@ -89,7 +89,7 @@ public class CacheBenchmarks
     public object NewTransit_ReadCache()
     {
         using var ms = new MemoryStream(_newJsonWithCaching);
-        var reader = NewTransitFactory.Reader(NewTransitFactory.Format.Json, ms);
+        using var reader = NewTransitFactory.Reader(NewTransitFactory.Format.Json, ms);
         return reader.Read<object>();
     }
 }

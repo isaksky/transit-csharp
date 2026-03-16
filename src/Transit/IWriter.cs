@@ -4,7 +4,7 @@ namespace Transit;
 /// Writes transit-encoded data.
 /// </summary>
 /// <typeparam name="T">The type of the value to write.</typeparam>
-public interface IWriter<in T>
+public interface IWriter<in T> : IDisposable
 {
     /// <summary>
     /// Writes a value.

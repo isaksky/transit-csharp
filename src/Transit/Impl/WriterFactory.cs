@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections;
 using System.Collections.Frozen;
 using System.Numerics;
@@ -82,10 +83,11 @@ internal static class WriterFactory
         return dict.ToFrozenDictionary();
     }
 
-    public static IWriter<T> GetJsonInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool verboseMode)
+    public static IWriter<T> GetJsonInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool verboseMode, bool ownsStream = true)
     {
         var handlers = Handlers(customHandlers);
-        var jsonWriter = new Utf8JsonWriter(output, new JsonWriterOptions
+        var bufferWriter = new ArrayBufferWriter<byte>();
+        var jsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions
         {
             SkipValidation = true,
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
@@ -105,10 +107,10 @@ internal static class WriterFactory
         }
 
         var wc = new WriteCache(!verboseMode);
-        return new Writer<T>(output, emitter, wc);
+        return new Writer<T>(output, emitter, wc, bufferWriter, ownsStream);
     }
 
-    public static IWriter<T> GetMsgPackInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers)
+    public static IWriter<T> GetMsgPackInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool ownsStream = true)
         => throw new NotImplementedException("MessagePack is not yet implemented.");
 
     private sealed class Writer<T> : IWriter<T>
@@ -116,19 +118,32 @@ internal static class WriterFactory
         private readonly Stream _output;
         private readonly JsonEmitter _emitter;
         private readonly WriteCache _wc;
+        private readonly ArrayBufferWriter<byte> _buf;
+        private readonly bool _ownsStream;
 
-        public Writer(Stream output, JsonEmitter emitter, WriteCache wc)
+        public Writer(Stream output, JsonEmitter emitter, WriteCache wc, ArrayBufferWriter<byte> buf, bool ownsStream)
         {
             _output = output;
             _emitter = emitter;
             _wc = wc;
+            _buf = buf;
+            _ownsStream = ownsStream;
         }
 
         public void Write(T value)
         {
             _emitter.Emit(value!, false, _wc.Init());
             _emitter.JsonWriter.Flush();
+            _output.Write(_buf.WrittenSpan);
+            _buf.ResetWrittenCount();
             _output.Flush();
+        }
+
+        public void Dispose()
+        {
+            _emitter.JsonWriter.Dispose();
+            if (_ownsStream)
+                _output.Dispose();
         }
     }
 }

@@ -76,15 +76,17 @@ internal static class ReaderFactory
     public static IReader GetJsonInstance(
         Stream input,
         IDictionary<string, IReadHandler>? customHandlers,
-        IDefaultReadHandler<object>? customDefaultHandler)
+        IDefaultReadHandler<object>? customDefaultHandler,
+        bool ownsStream = true)
     {
-        return new JsonReader(input, Handlers(customHandlers), DefaultHandler(customDefaultHandler));
+        return new JsonReader(input, Handlers(customHandlers), DefaultHandler(customDefaultHandler), ownsStream);
     }
 
     public static IReader GetMsgPackInstance(
         Stream input,
         IDictionary<string, IReadHandler>? customHandlers,
-        IDefaultReadHandler<object>? customDefaultHandler)
+        IDefaultReadHandler<object>? customDefaultHandler,
+        bool ownsStream = true)
     {
         throw new NotImplementedException("MessagePack is not yet implemented.");
     }
@@ -96,16 +98,18 @@ internal static class ReaderFactory
         protected IDefaultReadHandler<object> DefaultHandlerInst;
         protected IDictionaryReader? DictBuilder;
         protected IListReader? LstBuilder;
+        private readonly bool _ownsStream;
         private ReadCache _cache;
         private IParser? _parser;
         private bool _initialized;
 
-        public Reader(Stream input, FrozenDictionary<string, IReadHandler> handlers, IDefaultReadHandler<object> defaultHandler)
+        public Reader(Stream input, FrozenDictionary<string, IReadHandler> handlers, IDefaultReadHandler<object> defaultHandler, bool ownsStream)
         {
             _initialized = false;
             Input = input;
             HandlersDict = handlers;
             DefaultHandlerInst = defaultHandler;
+            _ownsStream = ownsStream;
             _cache = new ReadCache();
         }
 
@@ -143,13 +147,17 @@ internal static class ReaderFactory
         protected virtual IParser CreateParser()
             => throw new NotImplementedException();
 
-        public virtual void Dispose() { }
+        public virtual void Dispose()
+        {
+            if (_ownsStream)
+                Input.Dispose();
+        }
     }
 
     private sealed class JsonReader : Reader
     {
-        public JsonReader(Stream input, FrozenDictionary<string, IReadHandler> handlers, IDefaultReadHandler<object> defaultHandler)
-            : base(input, handlers, defaultHandler)
+        public JsonReader(Stream input, FrozenDictionary<string, IReadHandler> handlers, IDefaultReadHandler<object> defaultHandler, bool ownsStream)
+            : base(input, handlers, defaultHandler, ownsStream)
         {
         }
 

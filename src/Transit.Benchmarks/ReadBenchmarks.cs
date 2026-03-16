@@ -38,13 +38,13 @@ public class ReadBenchmarks
         // New payloads
         using (var ms = new MemoryStream())
         {
-            var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms);
+            using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms, ownsStream: false);
             writer.Write(data);
             _newJsonPayload = ms.ToArray();
         }
         using (var ms = new MemoryStream())
         {
-            var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.JsonVerbose, ms);
+            using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.JsonVerbose, ms, ownsStream: false);
             writer.Write(data);
             _newJsonVerbosePayload = ms.ToArray();
         }
@@ -62,7 +62,7 @@ public class ReadBenchmarks
     public object NewTransit_ReadJson()
     {
         using var ms = new MemoryStream(_newJsonPayload);
-        var reader = NewTransitFactory.Reader(NewTransitFactory.Format.Json, ms);
+        using var reader = NewTransitFactory.Reader(NewTransitFactory.Format.Json, ms);
         return reader.Read<object>();
     }
 
@@ -78,7 +78,7 @@ public class ReadBenchmarks
     public object NewTransit_ReadJsonVerbose()
     {
         using var ms = new MemoryStream(_newJsonVerbosePayload);
-        var reader = NewTransitFactory.Reader(NewTransitFactory.Format.JsonVerbose, ms);
+        using var reader = NewTransitFactory.Reader(NewTransitFactory.Format.JsonVerbose, ms);
         return reader.Read<object>();
     }
 }
