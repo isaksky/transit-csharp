@@ -37,6 +37,8 @@ internal static class ReaderFactory
             ["ratio"] = new RatioReadHandler(),
             ["cmap"] = new CDictionaryReadHandler(),
             ["link"] = new LinkReadHandler(),
+            ["duration"] = new TimeSpanReadHandler(),
+            ["dto"] = new DateTimeOffsetReadHandler(),
         };
         return dict.ToFrozenDictionary();
     }

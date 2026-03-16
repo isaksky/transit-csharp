@@ -254,3 +254,15 @@ internal sealed class DefaultReadHandler : IDefaultReadHandler<ITaggedValue>
     public ITaggedValue FromRepresentation(string tag, object representation)
         => TransitFactory.TaggedValue(tag, representation);
 }
+
+internal sealed class TimeSpanReadHandler : IReadHandler
+{
+    public object FromRepresentation(object representation)
+        => TimeSpan.Parse((string)representation, CultureInfo.InvariantCulture);
+}
+
+internal sealed class DateTimeOffsetReadHandler : IReadHandler
+{
+    public object FromRepresentation(object representation)
+        => DateTimeOffset.Parse((string)representation, CultureInfo.InvariantCulture);
+}

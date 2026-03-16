@@ -216,3 +216,40 @@ internal sealed class DictionaryWriteHandler : AbstractWriteHandler, IAbstractEm
         return TransitFactory.TaggedValue("array", list);
     }
 }
+
+internal sealed class TimeSpanWriteHandler : AbstractWriteHandler
+{
+    public override string Tag(object obj) => "duration";
+    public override object Representation(object obj) => ((TimeSpan)obj).ToString("c", CultureInfo.InvariantCulture);
+    public override string? StringRepresentation(object obj) => ((TimeSpan)obj).ToString("c", CultureInfo.InvariantCulture);
+}
+
+internal sealed class DateTimeOffsetWriteHandler : AbstractWriteHandler
+{
+    public override string Tag(object obj) => "dto";
+    public override object Representation(object obj) => ((DateTimeOffset)obj).ToString("O");
+    public override string? StringRepresentation(object obj) => ((DateTimeOffset)obj).ToString("O");
+}
+
+internal sealed class EnumWriteHandler : AbstractWriteHandler
+{
+    public override string Tag(object obj) => "s";
+    public override object Representation(object obj) => obj.ToString()!;
+    public override string? StringRepresentation(object obj) => obj.ToString();
+}
+
+internal sealed class TupleWriteHandler : AbstractWriteHandler
+{
+    public override string Tag(object obj) => "array";
+    public override object Representation(object obj)
+    {
+        if (obj is System.Runtime.CompilerServices.ITuple tuple)
+        {
+            var list = new List<object?>(tuple.Length);
+            for (int i = 0; i < tuple.Length; i++)
+                list.Add(tuple[i]);
+            return list;
+        }
+        return obj;
+    }
+}

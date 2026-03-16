@@ -58,6 +58,10 @@ internal static class WriterFactory
             [typeof(bool[])] = listHandler,
             [typeof(char[])] = listHandler,
             [typeof(object[])] = listHandler,
+            [typeof(TimeSpan)] = new TimeSpanWriteHandler(),
+            [typeof(DateTimeOffset)] = new DateTimeOffsetWriteHandler(),
+            [typeof(Enum)] = new EnumWriteHandler(),
+            [typeof(System.Runtime.CompilerServices.ITuple)] = new TupleWriteHandler(),
         };
         return dict.ToFrozenDictionary();
     }
