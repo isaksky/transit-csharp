@@ -149,6 +149,7 @@ internal static class ReaderFactory
 
         public virtual void Dispose()
         {
+            _parser = null;  // release the backing byte[] eagerly
             if (_ownsStream)
                 Input.Dispose();
         }
@@ -174,7 +175,9 @@ internal static class ReaderFactory
         {
             if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
             {
-                // Zero-copy path for MemoryStream
+                // Fast path for MemoryStream: avoids an extra CopyTo into a second MemoryStream,
+                // but still allocates a new byte[] because ReadOnlySequence<byte> requires
+                // a managed array that outlives the MemoryStream.
                 var buf = new byte[segment.Count];
                 Buffer.BlockCopy(segment.Array!, segment.Offset, buf, 0, segment.Count);
                 return buf;

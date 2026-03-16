@@ -11,6 +11,8 @@ namespace Transit.Impl;
 internal abstract class AbstractEmitter : IEmitter
 {
     private readonly FrozenDictionary<Type, IWriteHandler> _handlers;
+    // Caches resolved handlers for types not in the FrozenDictionary (subclasses / interface matches).
+    // Growth is bounded by the number of distinct serialised types, which is small in practice.
     private readonly ConcurrentDictionary<Type, IWriteHandler?> _handlerCache = new();
 
     protected AbstractEmitter(FrozenDictionary<Type, IWriteHandler> handlers)

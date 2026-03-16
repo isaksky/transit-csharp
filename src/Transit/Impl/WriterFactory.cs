@@ -120,6 +120,7 @@ internal static class WriterFactory
         private readonly WriteCache _wc;
         private readonly ArrayBufferWriter<byte> _buf;
         private readonly bool _ownsStream;
+        private bool _disposed;
 
         public Writer(Stream output, JsonEmitter emitter, WriteCache wc, ArrayBufferWriter<byte> buf, bool ownsStream)
         {
@@ -141,6 +142,8 @@ internal static class WriterFactory
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
             _emitter.JsonWriter.Dispose();
             if (_ownsStream)
                 _output.Dispose();
