@@ -1596,7 +1596,7 @@ public class TransitTest
         var d = DateTime.UtcNow;
         var jsonMachine = WriteJson(d);
         Assert.IsTrue(jsonMachine.Contains("~m"), "JSON mode should use ~m tag");
-        var readMachine = Reader(jsonMachine).Read<DateTime>();
+        var readMachine = Reader(jsonMachine).Read<DateTime>().ToUniversalTime();
         // millisecond precision
         Assert.AreEqual(d.Year, readMachine.Year);
         Assert.AreEqual(d.Month, readMachine.Month);
@@ -1608,7 +1608,7 @@ public class TransitTest
 
         // Pre-1970 timestamps
         var pre1970 = new DateTime(1776, 7, 4, 12, 0, 0, DateTimeKind.Utc);
-        var pre1970Read = Reader(WriteJson(pre1970)).Read<DateTime>();
+        var pre1970Read = Reader(WriteJson(pre1970)).Read<DateTime>().ToUniversalTime();
         Assert.AreEqual(pre1970.Year, pre1970Read.Year);
         Assert.AreEqual(pre1970.Month, pre1970Read.Month);
 
