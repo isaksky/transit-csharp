@@ -98,7 +98,27 @@ var customReadHandlers = new Dictionary<string, IReadHandler>
 {
     ["my-tag"] = new MyReadHandler()
 };
-var reader = TransitFactory.Reader(TransitFactory.Format.Json, stream, customReadHandlers, null);
+var reader = TransitFactory.Reader(TransitFactory.Format.Json, stream, customReadHandlers);
+
+// Catch-all Default Write Handler (called for unregistered types)
+using var w = TransitFactory.Writer<object>(TransitFactory.Format.Json, stream, null, myDefaultHandler);
+
+// Write-time Transform (modify objects before handler lookup)
+Func<object, object> transform = obj => obj is Point p ? new[] { p.X, p.Y } : obj;
+using var tw = TransitFactory.Writer<object>(TransitFactory.Format.Json, stream, null, null, transform);
+```
+
+### High-performance Pre-merged Handlers
+
+If you are creating many readers and writers with custom handlers, you can pre-merge them once to avoid dictionary-merge allocations on every instantiation:
+
+```csharp
+var mergedWriteHandlers = TransitFactory.MergedWriteHandlers(customWriteHandlers);
+var mergedReadHandlers = TransitFactory.MergedReadHandlers(customReadHandlers);
+
+// Use the pre-merged frozen maps directly
+using var writer = TransitFactory.Writer<object>(TransitFactory.Format.Json, stream, mergedWriteHandlers);
+using var reader = TransitFactory.Reader(TransitFactory.Format.Json, stream, mergedReadHandlers);
 ```
 
 ---
