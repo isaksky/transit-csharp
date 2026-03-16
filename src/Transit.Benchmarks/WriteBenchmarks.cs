@@ -62,4 +62,14 @@ public class WriteBenchmarks
         writer.Write(_dataPayload);
         return ms.ToArray();
     }
+
+    [Benchmark]
+    public byte[] NewTransit_WriteArray()
+    {
+        var array = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+        using var ms = new MemoryStream();
+        using var writer = NewTransitFactory.Writer<object>(NewTransitFactory.Format.Json, ms, ownsStream: false);
+        writer.Write(array);
+        return ms.ToArray();
+    }
 }

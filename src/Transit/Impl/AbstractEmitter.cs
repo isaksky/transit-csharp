@@ -11,13 +11,17 @@ namespace Transit.Impl;
 internal abstract class AbstractEmitter : IEmitter
 {
     private readonly FrozenDictionary<Type, IWriteHandler> _handlers;
+    private readonly IWriteHandler? _defaultWriteHandler;
+    private readonly Func<object, object>? _transform;
     // Caches resolved handlers for types not in the FrozenDictionary (subclasses / interface matches).
     // Growth is bounded by the number of distinct serialised types, which is small in practice.
     private readonly ConcurrentDictionary<Type, IWriteHandler?> _handlerCache = new();
 
-    protected AbstractEmitter(FrozenDictionary<Type, IWriteHandler> handlers)
+    protected AbstractEmitter(FrozenDictionary<Type, IWriteHandler> handlers, IWriteHandler? defaultWriteHandler = null, Func<object, object>? transform = null)
     {
         _handlers = handlers;
+        _defaultWriteHandler = defaultWriteHandler;
+        _transform = transform;
     }
 
     private IWriteHandler? CheckBaseClasses(Type type)
@@ -75,7 +79,8 @@ internal abstract class AbstractEmitter : IEmitter
 
         handler = CheckBaseClasses(type)
                ?? CheckBaseGenericInterfaces(type)
-               ?? CheckBaseInterfaces(type);
+               ?? CheckBaseInterfaces(type)
+               ?? _defaultWriteHandler;
 
         _handlerCache[type] = handler;
         return handler;
@@ -198,6 +203,9 @@ internal abstract class AbstractEmitter : IEmitter
 
     protected void Marshal(object? o, bool asDictionaryKey, WriteCache cache)
     {
+        if (_transform != null && o != null)
+            o = _transform(o);
+
         var h = GetHandler(o);
         if (h == null)
             throw new NotSupportedException("Not supported: " + (o?.GetType().ToString() ?? "null"));
@@ -233,6 +241,9 @@ internal abstract class AbstractEmitter : IEmitter
 
     protected void MarshalTop(object? obj, WriteCache cache)
     {
+        if (_transform != null && obj != null)
+            obj = _transform(obj);
+
         var handler = GetHandler(obj);
         if (handler == null)
             throw new NotSupportedException($"Cannot marshal type {obj?.GetType()} ({obj})");

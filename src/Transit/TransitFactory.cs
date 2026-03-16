@@ -1,4 +1,6 @@
+using System.Collections.Frozen;
 using Transit.Impl;
+using Transit.Spi;
 using System.Numerics;
 
 namespace Transit;
@@ -20,6 +22,20 @@ public static class TransitFactory
     }
 
     /// <summary>
+    /// Pre-merges custom read handlers with the default Transit handlers and returns a FrozenDictionary.
+    /// This allows caching the merged handlers map to avoid overhead on repeated reader creation.
+    /// </summary>
+    public static FrozenDictionary<string, IReadHandler> MergedReadHandlers(IDictionary<string, IReadHandler>? customHandlers)
+        => Impl.ReaderFactory.MergedHandlers(customHandlers);
+
+    /// <summary>
+    /// Pre-merges custom write handlers with the default Transit handlers and returns a FrozenDictionary.
+    /// This allows caching the merged handlers map to avoid overhead on repeated writer creation.
+    /// </summary>
+    public static FrozenDictionary<Type, IWriteHandler> MergedWriteHandlers(IDictionary<Type, IWriteHandler>? customHandlers)
+        => Impl.WriterFactory.MergedHandlers(customHandlers);
+
+    /// <summary>
     /// Creates a writer instance.
     /// </summary>
     public static IWriter<T> Writer<T>(Format type, Stream output, bool ownsStream = true)
@@ -29,12 +45,24 @@ public static class TransitFactory
     /// Creates a writer instance with custom handlers.
     /// </summary>
     public static IWriter<T> Writer<T>(Format type, Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool ownsStream = true)
+        => Writer<T>(type, output, customHandlers, null, null, ownsStream);
+
+    /// <summary>
+    /// Creates a writer instance with custom handlers and a default handler.
+    /// </summary>
+    public static IWriter<T> Writer<T>(Format type, Stream output, IDictionary<Type, IWriteHandler>? customHandlers, IWriteHandler? defaultWriteHandler, bool ownsStream = true)
+        => Writer<T>(type, output, customHandlers, defaultWriteHandler, null, ownsStream);
+
+    /// <summary>
+    /// Creates a writer instance with custom handlers, a default handler, and a write-time transform function.
+    /// </summary>
+    public static IWriter<T> Writer<T>(Format type, Stream output, IDictionary<Type, IWriteHandler>? customHandlers, IWriteHandler? defaultWriteHandler, Func<object, object>? transform, bool ownsStream = true)
     {
         return type switch
         {
-            Format.MsgPack => WriterFactory.GetMsgPackInstance<T>(output, customHandlers, ownsStream),
-            Format.Json => WriterFactory.GetJsonInstance<T>(output, customHandlers, false, ownsStream),
-            Format.JsonVerbose => WriterFactory.GetJsonInstance<T>(output, customHandlers, true, ownsStream),
+            Format.MsgPack => WriterFactory.GetMsgPackInstance<T>(output, customHandlers, ownsStream, defaultWriteHandler, transform),
+            Format.Json => WriterFactory.GetJsonInstance<T>(output, customHandlers, false, ownsStream, defaultWriteHandler, transform),
+            Format.JsonVerbose => WriterFactory.GetJsonInstance<T>(output, customHandlers, true, ownsStream, defaultWriteHandler, transform),
             _ => throw new ArgumentException("Unknown Writer type: " + type)
         };
     }
@@ -43,13 +71,19 @@ public static class TransitFactory
     /// Creates a reader instance.
     /// </summary>
     public static IReader Reader(Format type, Stream input, bool ownsStream = true)
-        => Reader(type, input, DefaultDefaultReadHandler(), ownsStream);
+        => Reader(type, input, null, DefaultDefaultReadHandler(), ownsStream);
 
     /// <summary>
     /// Creates a reader instance with a custom default handler.
     /// </summary>
     public static IReader Reader(Format type, Stream input, IDefaultReadHandler<object> customDefaultHandler, bool ownsStream = true)
         => Reader(type, input, null, customDefaultHandler, ownsStream);
+
+    /// <summary>
+    /// Creates a reader instance with custom handlers.
+    /// </summary>
+    public static IReader Reader(Format type, Stream input, IDictionary<string, IReadHandler> customHandlers, bool ownsStream = true)
+        => Reader(type, input, customHandlers, DefaultDefaultReadHandler(), ownsStream);
 
     /// <summary>
     /// Creates a reader instance with custom handlers and a custom default handler.

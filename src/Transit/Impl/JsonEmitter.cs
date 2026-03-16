@@ -15,8 +15,8 @@ internal class JsonEmitter : AbstractEmitter
 
     internal readonly Utf8JsonWriter JsonWriter;
 
-    public JsonEmitter(Utf8JsonWriter jsonWriter, FrozenDictionary<Type, IWriteHandler> handlers)
-        : base(handlers)
+    public JsonEmitter(Utf8JsonWriter jsonWriter, FrozenDictionary<Type, IWriteHandler> handlers, IWriteHandler? defaultWriteHandler = null, Func<object, object>? transform = null)
+        : base(handlers, defaultWriteHandler, transform)
     {
         JsonWriter = jsonWriter;
     }

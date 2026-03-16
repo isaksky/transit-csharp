@@ -19,6 +19,7 @@ internal static class WriterFactory
     private static FrozenDictionary<Type, IWriteHandler> BuildDefaultHandlers()
     {
         var integerHandler = new IntegerWriteHandler("i");
+        var listHandler = new ListWriteHandler();
         var dict = new Dictionary<Type, IWriteHandler>
         {
             [typeof(bool)] = new BooleanWriteHandler(),
@@ -46,17 +47,28 @@ internal static class WriterFactory
             [typeof(ITaggedValue)] = new TaggedValueWriteHandler(),
             [typeof(ISet<>)] = new SetWriteHandler(),
             [typeof(IEnumerable)] = new EnumerableWriteHandler(),
-            [typeof(IList<>)] = new ListWriteHandler(),
+            [typeof(IList<>)] = listHandler,
             [typeof(IDictionary<,>)] = new DictionaryWriteHandler(),
             [typeof(NullKeyDictionary)] = new DictionaryWriteHandler(),
+            [typeof(int[])] = listHandler,
+            [typeof(long[])] = listHandler,
+            [typeof(float[])] = listHandler,
+            [typeof(double[])] = listHandler,
+            [typeof(short[])] = listHandler,
+            [typeof(bool[])] = listHandler,
+            [typeof(char[])] = listHandler,
+            [typeof(object[])] = listHandler,
         };
         return dict.ToFrozenDictionary();
     }
 
     public static FrozenDictionary<Type, IWriteHandler> DefaultHandlers() => DefaultHandlersInstance;
 
-    private static FrozenDictionary<Type, IWriteHandler> Handlers(IDictionary<Type, IWriteHandler>? customHandlers)
+    public static FrozenDictionary<Type, IWriteHandler> MergedHandlers(IDictionary<Type, IWriteHandler>? customHandlers)
     {
+        if (customHandlers is FrozenDictionary<Type, IWriteHandler> frozen)
+            return frozen;
+
         if (customHandlers == null || customHandlers.Count == 0)
             return DefaultHandlersInstance;
 
@@ -83,9 +95,9 @@ internal static class WriterFactory
         return dict.ToFrozenDictionary();
     }
 
-    public static IWriter<T> GetJsonInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool verboseMode, bool ownsStream = true)
+    public static IWriter<T> GetJsonInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool verboseMode, bool ownsStream = true, IWriteHandler? defaultWriteHandler = null, Func<object, object>? transform = null)
     {
-        var handlers = Handlers(customHandlers);
+        var handlers = MergedHandlers(customHandlers);
         var bufferWriter = new ArrayBufferWriter<byte>();
         var jsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions
         {
@@ -97,12 +109,12 @@ internal static class WriterFactory
         if (verboseMode)
         {
             var verboseHandlers = GetVerboseHandlers(handlers);
-            emitter = new JsonVerboseEmitter(jsonWriter, verboseHandlers);
+            emitter = new JsonVerboseEmitter(jsonWriter, verboseHandlers, defaultWriteHandler, transform);
             SetSubHandler(verboseHandlers, emitter);
         }
         else
         {
-            emitter = new JsonEmitter(jsonWriter, handlers);
+            emitter = new JsonEmitter(jsonWriter, handlers, defaultWriteHandler, transform);
             SetSubHandler(handlers, emitter);
         }
 
@@ -110,7 +122,7 @@ internal static class WriterFactory
         return new Writer<T>(output, emitter, wc, bufferWriter, ownsStream);
     }
 
-    public static IWriter<T> GetMsgPackInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool ownsStream = true)
+    public static IWriter<T> GetMsgPackInstance<T>(Stream output, IDictionary<Type, IWriteHandler>? customHandlers, bool ownsStream = true, IWriteHandler? defaultWriteHandler = null, Func<object, object>? transform = null)
         => throw new NotImplementedException("MessagePack is not yet implemented.");
 
     private sealed class Writer<T> : IWriter<T>

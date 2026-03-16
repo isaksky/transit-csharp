@@ -855,6 +855,106 @@ public class TransitTest
         Assert.ThrowsException<NotSupportedException>(() => WriteJson(new Point(1, 2)));
     }
 
+    [TestMethod]
+    public void TestDefaultWriteHandlerFallback()
+    {
+        var defaultHandler = new CatchAllDefaultWriteHandler();
+        var unknownObj = new UnknownObject();
+
+        // 1. Verify JSON Verbose uses the default handler
+        using var output1 = new MemoryStream();
+        using var w1 = TransitFactory.Writer<object>(TransitFactory.Format.JsonVerbose, output1, null, defaultHandler);
+        w1.Write(unknownObj);
+        output1.Position = 0;
+        using var sr1 = new StreamReader(output1);
+        string jsonVerbose = sr1.ReadToEnd();
+        Assert.AreEqual("{\"~#unknown\":\"UnknownString\"}", jsonVerbose);
+
+        // 2. Verify normal JSON uses the default handler
+        using var output2 = new MemoryStream();
+        using var w2 = TransitFactory.Writer<object>(TransitFactory.Format.Json, output2, null, defaultHandler);
+        w2.Write(unknownObj);
+        output2.Position = 0;
+        using var sr2 = new StreamReader(output2);
+        string json = sr2.ReadToEnd();
+        Assert.AreEqual("[\"~#unknown\",\"UnknownString\"]", json);
+    }
+
+    [TestMethod]
+    public void TestWriteTimeTransform()
+    {
+        // Transform any Point into a string "x,y"
+        Func<object, object> transform = obj =>
+        {
+            if (obj is Point p)
+                return $"{p.X},{p.Y}";
+            return obj;
+        };
+
+        var point = new Point(37, 42);
+
+        // 1. Verify JSON Verbose uses the transform
+        using var output1 = new MemoryStream();
+        using var w1 = TransitFactory.Writer<object>(TransitFactory.Format.JsonVerbose, output1, null, null, transform);
+        w1.Write(point);
+        output1.Position = 0;
+        using var sr1 = new StreamReader(output1);
+        Assert.AreEqual("{\"~#'\":\"37,42\"}", sr1.ReadToEnd());
+
+        // 2. Verify normal JSON uses the transform
+        using var output2 = new MemoryStream();
+        using var w2 = TransitFactory.Writer<object>(TransitFactory.Format.Json, output2, null, null, transform);
+        w2.Write(point);
+        output2.Position = 0;
+        using var sr2 = new StreamReader(output2);
+        Assert.AreEqual("[\"~#'\",\"37,42\"]", sr2.ReadToEnd());
+    }
+
+    [TestMethod]
+    public void TestPreMergedHandlerMaps()
+    {
+        var customWriteHandlers = new Dictionary<Type, IWriteHandler>
+        {
+            [typeof(Point)] = new PointWriteHandler()
+        };
+
+        var customReadHandlers = new Dictionary<string, IReadHandler>
+        {
+            ["point"] = new PointReadHandler()
+        };
+
+        // 1. Create the frozen, pre-merged dictionaries
+        var mergedWriteHandlers = TransitFactory.MergedWriteHandlers(customWriteHandlers);
+        var mergedReadHandlers = TransitFactory.MergedReadHandlers(customReadHandlers);
+
+        var point = new Point(10, 20);
+
+        // 2. Use them in a writer
+        using var output = new MemoryStream();
+        using var writer = TransitFactory.Writer<object>(TransitFactory.Format.Json, output, mergedWriteHandlers);
+        writer.Write(point);
+        
+        output.Position = 0;
+        using var reader = TransitFactory.Reader(TransitFactory.Format.Json, output, mergedReadHandlers);
+        var readPoint = (Point)reader.Read<object>();
+
+        Assert.AreEqual(point.X, readPoint.X);
+        Assert.AreEqual(point.Y, readPoint.Y);
+    }
+
+    private class UnknownObject
+    {
+        public override string ToString() => "UnknownString";
+    }
+
+    private class CatchAllDefaultWriteHandler : IWriteHandler
+    {
+        public string Tag(object obj) => "unknown";
+        public object Representation(object obj) => obj.ToString()!;
+        public string? StringRepresentation(object obj) => obj.ToString();
+        public IWriteHandler? GetVerboseHandler() => null;
+    }
+
     private class TestListWriteHandler : IWriteHandler
     {
         public string Tag(object obj) => obj is List<object> ? "array" : "list";

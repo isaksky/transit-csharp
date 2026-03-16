@@ -57,8 +57,11 @@ internal static class ReaderFactory
         }
     }
 
-    private static FrozenDictionary<string, IReadHandler> Handlers(IDictionary<string, IReadHandler>? customHandlers)
+    public static FrozenDictionary<string, IReadHandler> MergedHandlers(IDictionary<string, IReadHandler>? customHandlers)
     {
+        if (customHandlers is FrozenDictionary<string, IReadHandler> frozen)
+            return frozen;
+
         DisallowOverridingGroundTypes(customHandlers);
 
         if (customHandlers == null || customHandlers.Count == 0)
@@ -79,7 +82,7 @@ internal static class ReaderFactory
         IDefaultReadHandler<object>? customDefaultHandler,
         bool ownsStream = true)
     {
-        return new JsonReader(input, Handlers(customHandlers), DefaultHandler(customDefaultHandler), ownsStream);
+        return new JsonReader(input, MergedHandlers(customHandlers), DefaultHandler(customDefaultHandler), ownsStream);
     }
 
     public static IReader GetMsgPackInstance(

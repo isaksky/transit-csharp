@@ -8,8 +8,8 @@ namespace Transit.Impl;
 /// </summary>
 internal class JsonVerboseEmitter : JsonEmitter
 {
-    public JsonVerboseEmitter(Utf8JsonWriter jsonWriter, FrozenDictionary<Type, IWriteHandler> handlers)
-        : base(jsonWriter, handlers)
+    public JsonVerboseEmitter(Utf8JsonWriter jsonWriter, FrozenDictionary<Type, IWriteHandler> handlers, IWriteHandler? defaultWriteHandler = null, Func<object, object>? transform = null)
+        : base(jsonWriter, handlers, defaultWriteHandler, transform)
     {
     }
 
