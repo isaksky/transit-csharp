@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>Transit.Benchmarks.WriteBenchmarks-20260315-200101</title>
+<title>Transit.Benchmarks.WriteBenchmarks-20260315-201130</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -23,12 +23,12 @@ LaunchCount=1  WarmupCount=3
 </code></pre>
 
 <table>
-<thead><tr><th>Method               </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method               </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>OldTransit_WriteJson</td><td>2,666.6 ns</td><td>10.37 ns</td><td>0.57 ns</td><td>1.00</td><td>0.9995</td><td>0.0191</td><td>8.18 KB</td><td>1.00</td>
-</tr><tr><td>NewTransit_WriteJson</td><td>833.0 ns</td><td>14.67 ns</td><td>0.80 ns</td><td>0.31</td><td>0.4177</td><td>0.0048</td><td>3.42 KB</td><td>0.42</td>
-</tr><tr><td>OldTransit_WriteJsonVerbose</td><td>4,271.6 ns</td><td>307.88 ns</td><td>16.88 ns</td><td>1.60</td><td>1.1749</td><td>0.0229</td><td>9.64 KB</td><td>1.18</td>
-</tr><tr><td>NewTransit_WriteJsonVerbose</td><td>1,689.0 ns</td><td>15.52 ns</td><td>0.85 ns</td><td>0.63</td><td>0.7935</td><td>0.0153</td><td>6.49 KB</td><td>0.79</td>
+</thead><tbody><tr><td>OldTransit_WriteJson</td><td>2,697.0 ns</td><td>542.53 ns</td><td>29.74 ns</td><td>1.00</td><td>0.00</td><td>0.9995</td><td>0.0191</td><td>8.18 KB</td><td>1.00</td>
+</tr><tr><td>NewTransit_WriteJson</td><td>837.8 ns</td><td>91.74 ns</td><td>5.03 ns</td><td>0.31</td><td>0.00</td><td>0.4177</td><td>0.0048</td><td>3.42 KB</td><td>0.42</td>
+</tr><tr><td>OldTransit_WriteJsonVerbose</td><td>3,847.9 ns</td><td>365.33 ns</td><td>20.02 ns</td><td>1.43</td><td>0.02</td><td>1.1520</td><td>0.0229</td><td>9.46 KB</td><td>1.16</td>
+</tr><tr><td>NewTransit_WriteJsonVerbose</td><td>1,817.1 ns</td><td>16.15 ns</td><td>0.89 ns</td><td>0.67</td><td>0.01</td><td>0.8965</td><td>0.0210</td><td>7.34 KB</td><td>0.90</td>
 </tr></tbody></table>
 </body>
 </html>
