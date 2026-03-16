@@ -9,9 +9,9 @@ Job=ShortRun  Toolchain=InProcessNoEmitToolchain  IterationCount=3
 LaunchCount=1  WarmupCount=3  
 
 ```
-| Method                     | Mean       | Error    | StdDev  | Ratio | Gen0   | Gen1   | Allocated | Alloc Ratio |
-|--------------------------- |-----------:|---------:|--------:|------:|-------:|-------:|----------:|------------:|
-| OldTransit_ReadJson        | 1,909.7 ns | 49.46 ns | 2.71 ns |  1.00 | 2.9297 | 0.2251 |  23.99 KB |        1.00 |
-| NewTransit_ReadJson        |   601.9 ns | 28.77 ns | 1.58 ns |  0.32 | 1.9798 | 0.0610 |  16.21 KB |        0.68 |
-| OldTransit_ReadJsonVerbose | 1,904.0 ns | 46.20 ns | 2.53 ns |  1.00 | 2.9297 | 0.2251 |  23.99 KB |        1.00 |
-| NewTransit_ReadJsonVerbose |   600.8 ns | 20.56 ns | 1.13 ns |  0.31 | 1.9798 | 0.0610 |  16.21 KB |        0.68 |
+| Method                     | Mean       | Error     | StdDev   | Ratio | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|--------------------------- |-----------:|----------:|---------:|------:|-------:|-------:|----------:|------------:|
+| OldTransit_ReadJson        | 1,921.6 ns | 344.35 ns | 18.87 ns |  1.00 | 2.9297 | 0.2251 |  23.99 KB |        1.00 |
+| NewTransit_ReadJson        |   610.0 ns |  11.70 ns |  0.64 ns |  0.32 | 1.9798 | 0.0610 |  16.21 KB |        0.68 |
+| OldTransit_ReadJsonVerbose | 1,902.7 ns |  34.00 ns |  1.86 ns |  0.99 | 2.9297 | 0.2251 |  23.99 KB |        1.00 |
+| NewTransit_ReadJsonVerbose |   610.9 ns |  76.02 ns |  4.17 ns |  0.32 | 1.9798 | 0.0610 |  16.21 KB |        0.68 |

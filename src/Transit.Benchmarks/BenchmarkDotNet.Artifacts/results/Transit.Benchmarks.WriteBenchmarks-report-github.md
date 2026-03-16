@@ -9,9 +9,10 @@ Job=ShortRun  Toolchain=InProcessNoEmitToolchain  IterationCount=3
 LaunchCount=1  WarmupCount=3  
 
 ```
-| Method                      | Mean       | Error     | StdDev   | Ratio | Gen0   | Gen1   | Gen2   | Allocated | Alloc Ratio |
-|---------------------------- |-----------:|----------:|---------:|------:|-------:|-------:|-------:|----------:|------------:|
-| OldTransit_WriteJson        | 2,724.6 ns | 311.98 ns | 17.10 ns |  1.00 | 0.9995 | 0.0191 |      - |   8.18 KB |        1.00 |
-| NewTransit_WriteJson        |   456.5 ns |  65.67 ns |  3.60 ns |  0.17 | 0.1516 | 0.0005 |      - |   1.24 KB |        0.15 |
-| OldTransit_WriteJsonVerbose | 3,875.6 ns | 249.21 ns | 13.66 ns |  1.42 | 1.1520 | 0.0229 |      - |   9.46 KB |        1.16 |
-| NewTransit_WriteJsonVerbose | 2,227.2 ns | 156.50 ns |  8.58 ns |  0.82 | 0.8659 | 0.0114 | 0.0038 |    7.1 KB |        0.87 |
+| Method                      | Mean       | Error     | StdDev   | Ratio | RatioSD | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|---------------------------- |-----------:|----------:|---------:|------:|--------:|-------:|-------:|----------:|------------:|
+| OldTransit_WriteJson        | 2,663.1 ns | 607.25 ns | 33.29 ns |  1.00 |    0.00 | 0.9842 | 0.0191 |   8.06 KB |        1.00 |
+| NewTransit_WriteJson        |   838.2 ns | 129.16 ns |  7.08 ns |  0.31 |    0.01 | 0.4196 | 0.0038 |   3.43 KB |        0.43 |
+| OldTransit_WriteJsonVerbose | 4,040.0 ns | 255.29 ns | 13.99 ns |  1.52 |    0.02 | 1.1749 | 0.0229 |   9.64 KB |        1.20 |
+| NewTransit_WriteJsonVerbose | 2,181.1 ns | 139.97 ns |  7.67 ns |  0.82 |    0.01 | 1.1253 | 0.0343 |    9.2 KB |        1.14 |
+| NewTransit_WriteArray       |   338.5 ns |  28.41 ns |  1.56 ns |  0.13 |    0.00 | 0.3018 | 0.0038 |   2.47 KB |        0.31 |
