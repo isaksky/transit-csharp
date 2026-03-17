@@ -51,6 +51,81 @@ public static class ObjectDeserializer
             return Enum.Parse(targetType, value.ToString()!);
         }
 
+        // Arrays: T[]
+        if (targetType.IsArray && value is IList arrayList)
+        {
+            var elemType = targetType.GetElementType()!;
+            var arr = Array.CreateInstance(elemType, arrayList.Count);
+            for (int i = 0; i < arrayList.Count; i++)
+            {
+                arr.SetValue(MapValue(arrayList[i], elemType), i);
+            }
+            return arr;
+        }
+
+        // Generic list-like collections from IList source
+        if (value is IList sourceList && targetType.IsGenericType)
+        {
+            var genDef = targetType.GetGenericTypeDefinition();
+            var elemType = targetType.GetGenericArguments()[0];
+
+            // List<T>, IList<T>, ICollection<T>, IEnumerable<T>, IReadOnlyList<T>, IReadOnlyCollection<T>
+            if (genDef == typeof(List<>) || genDef == typeof(IList<>) ||
+                genDef == typeof(ICollection<>) || genDef == typeof(IEnumerable<>) ||
+                genDef == typeof(IReadOnlyList<>) || genDef == typeof(IReadOnlyCollection<>))
+            {
+                var listType = typeof(List<>).MakeGenericType(elemType);
+                var result = (IList)Activator.CreateInstance(listType, sourceList.Count)!;
+                for (int i = 0; i < sourceList.Count; i++)
+                {
+                    result.Add(MapValue(sourceList[i], elemType));
+                }
+                return result;
+            }
+        }
+
+        // HashSet<T>, ISet<T>, IReadOnlySet<T> from any IEnumerable source (incl. HashSet<object>)
+        if (value is IEnumerable sourceEnumerable && targetType.IsGenericType)
+        {
+            var genDef = targetType.GetGenericTypeDefinition();
+            if (genDef == typeof(HashSet<>) || genDef == typeof(ISet<>)
+#if NET5_0_OR_GREATER
+                || genDef == typeof(IReadOnlySet<>)
+#endif
+                )
+            {
+                var elemType = targetType.GetGenericArguments()[0];
+                var setType = typeof(HashSet<>).MakeGenericType(elemType);
+                var set = Activator.CreateInstance(setType)!;
+                var addMethod = setType.GetMethod("Add")!;
+                foreach (var item in sourceEnumerable)
+                {
+                    addMethod.Invoke(set, [MapValue(item, elemType)]);
+                }
+                return set;
+            }
+        }
+
+        // Generic dictionaries from IDictionary source
+        if (value is IDictionary sourceDict && targetType.IsGenericType)
+        {
+            var genDef = targetType.GetGenericTypeDefinition();
+            if (genDef == typeof(Dictionary<,>) || genDef == typeof(IDictionary<,>) ||
+                genDef == typeof(IReadOnlyDictionary<,>))
+            {
+                var args = targetType.GetGenericArguments();
+                var keyType = args[0];
+                var valType = args[1];
+                var dictType = typeof(Dictionary<,>).MakeGenericType(keyType, valType);
+                var resultDict = (IDictionary)Activator.CreateInstance(dictType)!;
+                foreach (DictionaryEntry entry in sourceDict)
+                {
+                    resultDict.Add(MapValue(entry.Key, keyType)!, MapValue(entry.Value, valType)!);
+                }
+                return resultDict;
+            }
+        }
+
         if (targetType == typeof(int)) return (int)Util.NumberToPrimitiveLong(value);
         if (targetType == typeof(long)) return Util.NumberToPrimitiveLong(value);
         if (targetType == typeof(short)) return (short)Util.NumberToPrimitiveLong(value);
@@ -59,14 +134,15 @@ public static class ObjectDeserializer
         if (targetType == typeof(double)) return Convert.ToDouble(value);
         if (targetType == typeof(decimal)) return Convert.ToDecimal(value);
 
+        // String conversion (handles Keyword → string, etc.)
+        if (targetType == typeof(string)) return value.ToString();
+
         try
         {
             return Convert.ChangeType(value, targetType);
         }
         catch (InvalidCastException)
         {
-            // Fallback for types that might not implement IConvertible but have a constructor from the source type
-            // or just return the value if we're desperate (though it will probably fail later)
             return value;
         }
     }

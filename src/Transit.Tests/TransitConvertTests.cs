@@ -102,6 +102,69 @@ public class TransitConvertTests
     }
 
     [TestMethod]
+    public void TestListDeserialization()
+    {
+        var val = new[] { 1L, 2L, 3L };
+        var json = TransitConvert.SerializeObject(val, TransitFactory.Format.Json);
+
+        var list = TransitConvert.DeserializeObject<List<long>>(json, TransitFactory.Format.Json);
+        Assert.AreEqual(3, list.Count);
+        Assert.AreEqual(1L, list[0]);
+        Assert.AreEqual(2L, list[1]);
+        Assert.AreEqual(3L, list[2]);
+    }
+
+    [TestMethod]
+    public void TestDictionaryDeserialization()
+    {
+        var dict = new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 };
+        var json = TransitConvert.SerializeObject(dict, TransitFactory.Format.Json);
+
+        var result = TransitConvert.DeserializeObject<Dictionary<string, int>>(json, TransitFactory.Format.Json);
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(1, result["a"]);
+        Assert.AreEqual(2, result["b"]);
+    }
+
+    [TestMethod]
+    public void TestHashSetDeserialization()
+    {
+        var set = new HashSet<string> { "x", "y", "z" };
+        var json = TransitConvert.SerializeObject(set, TransitFactory.Format.Json);
+
+        var result = TransitConvert.DeserializeObject<HashSet<string>>(json, TransitFactory.Format.Json);
+        Assert.AreEqual(3, result.Count);
+        Assert.IsTrue(result.Contains("x"));
+        Assert.IsTrue(result.Contains("y"));
+        Assert.IsTrue(result.Contains("z"));
+    }
+
+    public class PocoWithCollections
+    {
+        public List<int> Numbers { get; set; } = new();
+        public Dictionary<string, string> Labels { get; set; } = new();
+        public SampleEnum[] Statuses { get; set; } = [];
+    }
+
+    [TestMethod]
+    public void TestPocoWithCollections()
+    {
+        var poco = new PocoWithCollections
+        {
+            Numbers = [10, 20, 30],
+            Labels = new Dictionary<string, string> { ["k1"] = "v1", ["k2"] = "v2" },
+            Statuses = [SampleEnum.First, SampleEnum.Third],
+        };
+
+        var json = TransitConvert.SerializeObject(poco, TransitFactory.Format.Json);
+        var result = TransitConvert.DeserializeObject<PocoWithCollections>(json, TransitFactory.Format.Json);
+
+        CollectionAssert.AreEqual(poco.Numbers, result.Numbers);
+        CollectionAssert.AreEqual(poco.Labels, result.Labels);
+        CollectionAssert.AreEqual(poco.Statuses, result.Statuses);
+    }
+
+    [TestMethod]
     public void TestCachingPerformance()
     {
         var poco = new ChildPoco { Name = "Test", Age = 1 };

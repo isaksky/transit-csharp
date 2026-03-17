@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Transit.Serialization;
 
@@ -65,38 +63,7 @@ public static class TransitConvert
         if (result == null) return default!;
         if (result is T typedResult) return typedResult;
 
-        var targetType = typeof(T);
-
-        // If T is a POCO and result is a dictionary, map it
-        if (result is IDictionary dict && !IsBuiltInType(targetType))
-        {
-            return ObjectDeserializer.Deserialize<T>(dict);
-        }
-
-        // If T is a tuple and result is a list, convert
-        if (result is IList list && typeof(ITuple).IsAssignableFrom(targetType))
-        {
-            return (T)ObjectDeserializer.MapValue(result, targetType)!;
-        }
-
-        if (targetType.IsEnum && result is string s)
-        {
-            return (T)Enum.Parse(targetType, s);
-        }
-
-        // Try simple cast or conversion
-        return (T)Convert.ChangeType(result, targetType);
-    }
-
-    private static bool IsBuiltInType(Type type)
-    {
-        return type.IsPrimitive || 
-               type == typeof(string) || 
-               type == typeof(decimal) || 
-               type == typeof(DateTime) || 
-               type == typeof(Guid) || 
-               type == typeof(Uri) ||
-               typeof(IEnumerable).IsAssignableFrom(type);
+        return (T)ObjectDeserializer.MapValue(result, typeof(T))!;
     }
 
     private class ObjectSerializationWriteHandler : IWriteHandler
