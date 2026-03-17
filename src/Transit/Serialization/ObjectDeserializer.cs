@@ -8,11 +8,13 @@ using Transit.Impl;
 namespace Transit.Serialization;
 
 /// <summary>
-/// Provides high-performance deserialization for POCOs using compiled expression trees.
+/// Provides high-performance deserialization for POCOs using compiled expression trees
+/// and cached per-type converters.
 /// </summary>
 public static class ObjectDeserializer
 {
     private static readonly ConcurrentDictionary<Type, Func<IDictionary, object>> _deserializerCache = new();
+    private static readonly ConcurrentDictionary<Type, Func<object, object?>> _converterCache = new();
 
     /// <summary>
     /// Deserializes a dictionary into an object of the specified type.
@@ -30,138 +32,258 @@ public static class ObjectDeserializer
 
     /// <summary>
     /// Maps a value to the target type, handling recursive POCO deserialization and conversions.
+    /// Uses cached per-type converters to avoid repeated reflection.
     /// </summary>
     public static object? MapValue(object? value, Type targetType)
     {
         if (value == null) return null;
         if (targetType.IsAssignableFrom(value.GetType())) return value;
 
-        if (value is IDictionary dict && !IsBuiltInType(targetType))
-        {
-            return Deserialize(dict, targetType);
-        }
+        var converter = _converterCache.GetOrAdd(targetType, CreateConverter);
+        return converter(value);
+    }
 
-        if (value is IList list && typeof(ITuple).IsAssignableFrom(targetType))
-        {
-            return MapValueTuple(list, targetType);
-        }
-
+    /// <summary>
+    /// Creates a cached converter function for the given target type.
+    /// All reflection (GetGenericTypeDefinition, MakeGenericType, GetMethod, etc.)
+    /// happens once here; subsequent calls just invoke the delegate.
+    /// </summary>
+    private static Func<object, object?> CreateConverter(Type targetType)
+    {
+        // Enum
         if (targetType.IsEnum)
         {
-            return Enum.Parse(targetType, value.ToString()!);
+            return value => Enum.Parse(targetType, value.ToString()!);
         }
 
         // Arrays: T[]
-        if (targetType.IsArray && value is IList arrayList)
+        if (targetType.IsArray)
         {
             var elemType = targetType.GetElementType()!;
-            var arr = Array.CreateInstance(elemType, arrayList.Count);
-            for (int i = 0; i < arrayList.Count; i++)
+            return value =>
             {
-                arr.SetValue(MapValue(arrayList[i], elemType), i);
-            }
-            return arr;
+                if (value is IList list)
+                {
+                    var arr = Array.CreateInstance(elemType, list.Count);
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        arr.SetValue(MapValue(list[i], elemType), i);
+                    }
+                    return arr;
+                }
+                return value;
+            };
         }
 
-        // Generic list-like collections from IList source
-        if (value is IList sourceList && targetType.IsGenericType)
+        // ValueTuples
+        if (typeof(ITuple).IsAssignableFrom(targetType))
+        {
+            var fields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(f => f.Name.StartsWith("Item"))
+                .OrderBy(f => f.Name.Length)
+                .ThenBy(f => f.Name)
+                .ToArray();
+            var fieldTypes = fields.Select(f => f.FieldType).ToArray();
+
+            // Find the constructor that takes all the fields
+            var ctor = targetType.GetConstructor(fieldTypes);
+            
+            if (ctor != null)
+            {
+                // Compile factory: args => new TupleType((T1)args[0], (T2)args[1], ...)
+                var argsParam = Expression.Parameter(typeof(object[]), "args");
+                var ctorArgs = new Expression[fields.Length];
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    var arrayAccess = Expression.ArrayIndex(argsParam, Expression.Constant(i));
+                    ctorArgs[i] = Expression.Convert(arrayAccess, fieldTypes[i]);
+                }
+                var createTuple = Expression.Lambda<Func<object[], object>>(
+                    Expression.Convert(Expression.New(ctor, ctorArgs), typeof(object)),
+                    argsParam).Compile();
+
+                return value =>
+                {
+                    if (value is IList list)
+                    {
+                        int count = Math.Min(list.Count, fields.Length);
+                        var args = new object[fields.Length]; // Default initialized to null/0
+                        for (int i = 0; i < count; i++)
+                        {
+                            args[i] = MapValue(list[i], fieldTypes[i])!;
+                        }
+                        // For any missing items, we need default value to satisfy ctor
+                        for (int i = count; i < fields.Length; i++)
+                        {
+                            args[i] = fieldTypes[i].IsValueType ? Activator.CreateInstance(fieldTypes[i])! : null!;
+                        }
+                        
+                        return createTuple(args);
+                    }
+                    return value;
+                };
+            }
+        }
+
+        // Generic single-element collections
+        if (targetType.IsGenericType)
         {
             var genDef = targetType.GetGenericTypeDefinition();
-            var elemType = targetType.GetGenericArguments()[0];
+            var genArgs = targetType.GetGenericArguments();
 
             // List<T>, IList<T>, ICollection<T>, IEnumerable<T>, IReadOnlyList<T>, IReadOnlyCollection<T>
             if (genDef == typeof(List<>) || genDef == typeof(IList<>) ||
                 genDef == typeof(ICollection<>) || genDef == typeof(IEnumerable<>) ||
                 genDef == typeof(IReadOnlyList<>) || genDef == typeof(IReadOnlyCollection<>))
             {
+                var elemType = genArgs[0];
                 var listType = typeof(List<>).MakeGenericType(elemType);
-                var result = (IList)Activator.CreateInstance(listType, sourceList.Count)!;
-                for (int i = 0; i < sourceList.Count; i++)
-                {
-                    result.Add(MapValue(sourceList[i], elemType));
-                }
-                return result;
-            }
-        }
+                var ctor = listType.GetConstructor([typeof(int)])!;
+                
+                // Compile list creator: count => new List<T>(count)
+                var countParam = Expression.Parameter(typeof(int), "count");
+                var createList = Expression.Lambda<Func<int, IList>>(
+                    Expression.Convert(Expression.New(ctor, countParam), typeof(IList)),
+                    countParam).Compile();
 
-        // HashSet<T>, ISet<T>, IReadOnlySet<T> from any IEnumerable source (incl. HashSet<object>)
-        if (value is IEnumerable sourceEnumerable && targetType.IsGenericType)
-        {
-            var genDef = targetType.GetGenericTypeDefinition();
+                var addMethod = listType.GetMethod("Add")!;
+                // Build a compiled add delegate: (list, item) => ((List<T>)list).Add((T)item)
+                var listParam = Expression.Parameter(typeof(object), "list");
+                var itemParam = Expression.Parameter(typeof(object), "item");
+                var addCall = Expression.Call(
+                    Expression.Convert(listParam, listType),
+                    addMethod,
+                    Expression.Convert(itemParam, elemType));
+                var addDelegate = Expression.Lambda<Action<object, object?>>(addCall, listParam, itemParam).Compile();
+
+                return value =>
+                {
+                    if (value is IList sourceList)
+                    {
+                        var result = createList(sourceList.Count);
+                        for (int i = 0; i < sourceList.Count; i++)
+                        {
+                            addDelegate(result, MapValue(sourceList[i], elemType));
+                        }
+                        return result;
+                    }
+                    return value;
+                };
+            }
+
+            // HashSet<T>, ISet<T>, IReadOnlySet<T>
             if (genDef == typeof(HashSet<>) || genDef == typeof(ISet<>)
 #if NET5_0_OR_GREATER
                 || genDef == typeof(IReadOnlySet<>)
 #endif
                 )
             {
-                var elemType = targetType.GetGenericArguments()[0];
+                var elemType = genArgs[0];
                 var setType = typeof(HashSet<>).MakeGenericType(elemType);
-                var set = Activator.CreateInstance(setType)!;
-                var addMethod = setType.GetMethod("Add")!;
-                foreach (var item in sourceEnumerable)
-                {
-                    addMethod.Invoke(set, [MapValue(item, elemType)]);
-                }
-                return set;
-            }
-        }
+                
+                // Compile set creator: () => new HashSet<T>()
+                var createSet = Expression.Lambda<Func<object>>(Expression.New(setType)).Compile();
 
-        // Generic dictionaries from IDictionary source
-        if (value is IDictionary sourceDict && targetType.IsGenericType)
-        {
-            var genDef = targetType.GetGenericTypeDefinition();
+                var setAddMethod = setType.GetMethod("Add")!;
+                // Build a compiled add delegate
+                var setParam = Expression.Parameter(typeof(object), "set");
+                var itemParam = Expression.Parameter(typeof(object), "item");
+                var addCall = Expression.Call(
+                    Expression.Convert(setParam, setType),
+                    setAddMethod,
+                    Expression.Convert(itemParam, elemType));
+                var addDelegate = Expression.Lambda<Action<object, object?>>(addCall, setParam, itemParam).Compile();
+
+                return value =>
+                {
+                    if (value is IEnumerable source)
+                    {
+                        var set = createSet();
+                        foreach (var item in source)
+                        {
+                            addDelegate(set, MapValue(item, elemType));
+                        }
+                        return set;
+                    }
+                    return value;
+                };
+            }
+
+            // Dictionary<K,V>, IDictionary<K,V>, IReadOnlyDictionary<K,V>
             if (genDef == typeof(Dictionary<,>) || genDef == typeof(IDictionary<,>) ||
                 genDef == typeof(IReadOnlyDictionary<,>))
             {
-                var args = targetType.GetGenericArguments();
-                var keyType = args[0];
-                var valType = args[1];
+                var keyType = genArgs[0];
+                var valType = genArgs[1];
                 var dictType = typeof(Dictionary<,>).MakeGenericType(keyType, valType);
-                var resultDict = (IDictionary)Activator.CreateInstance(dictType)!;
-                foreach (DictionaryEntry entry in sourceDict)
+                
+                // Compile dict creator: () => new Dictionary<K,V>()
+                var createDict = Expression.Lambda<Func<IDictionary>>(
+                    Expression.Convert(Expression.New(dictType), typeof(IDictionary))).Compile();
+
+                var dictAddMethod = dictType.GetMethod("Add", [keyType, valType])!;
+                // Build compiled add delegate: (dict, key, val) => ((Dict<K,V>)dict).Add((K)key, (V)val)
+                var dictParam = Expression.Parameter(typeof(object), "dict");
+                var keyParam = Expression.Parameter(typeof(object), "key");
+                var valParam = Expression.Parameter(typeof(object), "val");
+                var addExpr = Expression.Call(
+                    Expression.Convert(dictParam, dictType),
+                    dictAddMethod,
+                    Expression.Convert(keyParam, keyType),
+                    Expression.Convert(valParam, valType));
+                var addDelegate = Expression.Lambda<Action<object, object, object?>>(addExpr, dictParam, keyParam, valParam).Compile();
+
+                return value =>
                 {
-                    resultDict.Add(MapValue(entry.Key, keyType)!, MapValue(entry.Value, valType)!);
-                }
-                return resultDict;
+                    if (value is IDictionary sourceDict)
+                    {
+                        var result = createDict();
+                        foreach (DictionaryEntry entry in sourceDict)
+                        {
+                            addDelegate(result, MapValue(entry.Key, keyType)!, MapValue(entry.Value, valType)!);
+                        }
+                        return result;
+                    }
+                    return value;
+                };
             }
         }
 
-        if (targetType == typeof(int)) return (int)Util.NumberToPrimitiveLong(value);
-        if (targetType == typeof(long)) return Util.NumberToPrimitiveLong(value);
-        if (targetType == typeof(short)) return (short)Util.NumberToPrimitiveLong(value);
-        if (targetType == typeof(byte)) return (byte)Util.NumberToPrimitiveLong(value);
-        if (targetType == typeof(float)) return Convert.ToSingle(value);
-        if (targetType == typeof(double)) return Convert.ToDouble(value);
-        if (targetType == typeof(decimal)) return Convert.ToDecimal(value);
-
-        // String conversion (handles Keyword → string, etc.)
-        if (targetType == typeof(string)) return value.ToString();
-
-        try
+        // POCO from IDictionary (non-built-in complex types)
+        if (!IsBuiltInType(targetType))
         {
-            return Convert.ChangeType(value, targetType);
+            return value =>
+            {
+                if (value is IDictionary dict)
+                    return Deserialize(dict, targetType);
+                return value;
+            };
         }
-        catch (InvalidCastException)
-        {
-            return value;
-        }
-    }
 
-    private static object MapValueTuple(IList list, Type targetType)
-    {
-        // ValueTuples have fields Item1, Item2...
-        var fields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-            .Where(f => f.Name.StartsWith("Item"))
-            .OrderBy(f => f.Name.Length)
-            .ThenBy(f => f.Name)
-            .ToArray();
+        // Numeric primitives — direct, no reflection needed per call
+        if (targetType == typeof(int)) return value => (int)Util.NumberToPrimitiveLong(value);
+        if (targetType == typeof(long)) return value => Util.NumberToPrimitiveLong(value);
+        if (targetType == typeof(short)) return value => (short)Util.NumberToPrimitiveLong(value);
+        if (targetType == typeof(byte)) return value => (byte)Util.NumberToPrimitiveLong(value);
+        if (targetType == typeof(float)) return value => Convert.ToSingle(value);
+        if (targetType == typeof(double)) return value => Convert.ToDouble(value);
+        if (targetType == typeof(decimal)) return value => Convert.ToDecimal(value);
 
-        object instance = Activator.CreateInstance(targetType)!;
-        for (int i = 0; i < Math.Min(list.Count, fields.Length); i++)
+        // String
+        if (targetType == typeof(string)) return value => value.ToString();
+
+        // Fallback
+        return value =>
         {
-            fields[i].SetValue(instance, MapValue(list[i], fields[i].FieldType));
-        }
-        return instance;
+            try
+            {
+                return Convert.ChangeType(value, targetType);
+            }
+            catch (InvalidCastException)
+            {
+                return value;
+            }
+        };
     }
 
     private static bool IsBuiltInType(Type type)
