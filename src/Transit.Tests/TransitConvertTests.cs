@@ -182,4 +182,93 @@ public class TransitConvertTests
         // 1000 serializations should be very fast (usually sub-100ms on modern machines)
         Assert.IsTrue(sw.ElapsedMilliseconds < 500, $"Serialization too slow: {sw.ElapsedMilliseconds}ms");
     }
+
+    [TestMethod]
+    public void TestStreamSerialization()
+    {
+        var poco = new ParentPoco
+        {
+            Title = "Stream Parent",
+            Child = new ChildPoco { Name = "Stream Child", Age = 11 },
+            Type = SampleEnum.First,
+            Duration = TimeSpan.FromMinutes(2.5),
+            Timestamp = DateTimeOffset.UtcNow,
+            TupleData = (100, "Hundred")
+        };
+
+        using var memoryStream = new MemoryStream();
+        TransitConvert.SerializeObject(poco, memoryStream, TransitFactory.Format.Json);
+        
+        // Reset stream position for reading
+        memoryStream.Position = 0;
+
+        var deserialized = TransitConvert.DeserializeObject<ParentPoco>(memoryStream, TransitFactory.Format.Json);
+
+        Assert.AreEqual(poco.Title, deserialized.Title);
+        Assert.AreEqual(poco.Child.Name, deserialized.Child.Name);
+        Assert.AreEqual(poco.Child.Age, deserialized.Child.Age);
+        Assert.AreEqual(poco.Type, deserialized.Type);
+        Assert.AreEqual(poco.Duration, deserialized.Duration);
+        Assert.AreEqual(poco.Timestamp.ToUnixTimeMilliseconds(), deserialized.Timestamp.ToUnixTimeMilliseconds());
+        Assert.AreEqual(poco.TupleData, deserialized.TupleData);
+    }
+
+    [TestMethod]
+    public void TestNullSerialization()
+    {
+        ParentPoco? nullPoco = null;
+
+        var json = TransitConvert.SerializeObject(nullPoco, TransitFactory.Format.Json);
+        var deserialized = TransitConvert.DeserializeObject<ParentPoco?>(json, TransitFactory.Format.Json);
+
+        Assert.IsNull(deserialized);
+    }
+
+    private class CustomIntWriteHandler : IWriteHandler
+    {
+        public string Tag(object obj) => "custom-int";
+        public object Representation(object obj) => ((int)obj).ToString() + "-custom";
+        public string? StringRepresentation(object obj) => null;
+        public IWriteHandler? GetVerboseHandler() => null;
+    }
+
+    private class CustomIntReadHandler : IReadHandler
+    {
+        public object FromRepresentation(object rep)
+        {
+            var str = (string)rep;
+            return int.Parse(str.Replace("-custom", ""));
+        }
+    }
+
+    [TestMethod]
+    public void TestCustomHandlers()
+    {
+        var settings = new TransitSerializerSettings
+        {
+            WriteHandlers = new Dictionary<Type, IWriteHandler>
+            {
+                [typeof(int)] = new CustomIntWriteHandler()
+            },
+            ReadHandlers = new Dictionary<string, IReadHandler>
+            {
+                ["custom-int"] = new CustomIntReadHandler()
+            }
+        };
+
+        var dict = new Dictionary<string, object>
+        {
+            ["number"] = 42
+        };
+
+        var json = TransitConvert.SerializeObject(dict, TransitFactory.Format.Json, settings);
+        
+        // Ensure the custom tag is used
+        Assert.IsTrue(json.Contains("~#custom-int"));
+
+        var deserialized = TransitConvert.DeserializeObject<Dictionary<string, object>>(json, TransitFactory.Format.Json, settings);
+
+        // Transit dictionary gives us strings by default for map string keys
+        Assert.AreEqual(42, deserialized["number"]);
+    }
 }
