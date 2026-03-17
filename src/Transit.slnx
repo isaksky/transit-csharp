@@ -1,0 +1,5 @@
+<Solution>
+    <Project Path="Transit/Transit.csproj" />
+    <Project Path="Transit.Tests/Transit.Tests.csproj" />
+    <Project Path="Transit.Benchmarks/Transit.Benchmarks.csproj" />
+</Solution>

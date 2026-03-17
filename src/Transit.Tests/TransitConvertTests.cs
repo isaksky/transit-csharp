@@ -92,9 +92,13 @@ public class TransitConvertTests
     [TestMethod]
     public void TestEnumDirectly()
     {
-        var val = SampleEnum.Third;
-        var json = TransitConvert.SerializeObject(val, TransitFactory.Format.Json);
-        Assert.AreEqual(val, TransitConvert.DeserializeObject<SampleEnum>(json, TransitFactory.Format.Json));
+        var val = new[] { SampleEnum.Third, SampleEnum.Second,  };
+        
+        foreach (var fmt in new[] {TransitFactory.Format.Json, TransitFactory.Format.JsonVerbose})
+        {
+            var json = TransitConvert.SerializeObject(val, fmt);
+            Assert.IsTrue(val.SequenceEqual(TransitConvert.DeserializeObject<SampleEnum[]>(json, fmt)));
+        }
     }
 
     [TestMethod]
