@@ -2,7 +2,7 @@ using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Toolchains.InProcess.NoEmit;
 
-namespace Transit.Benchmarks;
+namespace Transit.Net.Benchmarks;
 
 /// <summary>
 /// Quick but reliable benchmark config: runs in-process (no child process spawn),

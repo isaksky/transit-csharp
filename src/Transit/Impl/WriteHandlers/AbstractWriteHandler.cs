@@ -1,4 +1,4 @@
-namespace Transit.Impl.WriteHandlers;
+namespace Transit.Net.Impl.WriteHandlers;
 
 internal abstract class AbstractWriteHandler : IWriteHandler
 {

@@ -3,7 +3,7 @@ using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Transit;
 
-namespace Transit.Tests;
+namespace Transit.Net.Tests;
 
 [TestClass]
 public class TransitConvertTests

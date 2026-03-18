@@ -1,9 +1,9 @@
 using System.Collections.Frozen;
 using System.Text.Json;
-using Transit.Impl.ReadHandlers;
-using Transit.Spi;
+using Transit.Net.Impl.ReadHandlers;
+using Transit.Net.Spi;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Constructs transit readers using System.Text.Json.

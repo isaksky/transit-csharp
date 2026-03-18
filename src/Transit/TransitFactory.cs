@@ -1,9 +1,9 @@
 using System.Collections.Frozen;
-using Transit.Impl;
-using Transit.Spi;
+using Transit.Net.Impl;
+using Transit.Net.Spi;
 using System.Numerics;
 
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Main entry point for the Transit library. Provides methods to construct

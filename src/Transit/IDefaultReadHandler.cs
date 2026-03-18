@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Handles reading of unknown transit-encoded values.

@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// A read handler that can also decode list representations.

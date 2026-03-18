@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace Transit.Serialization;
+namespace Transit.Net.Serialization;
 
 /// <summary>
 /// Provides high-performance serialization for POCOs using compiled expression trees.

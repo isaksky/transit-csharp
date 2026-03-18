@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Represents a ratio (numerator/denominator) of BigIntegers.

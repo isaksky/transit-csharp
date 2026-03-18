@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using System.Globalization;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Base class for transit parsers. Uses FrozenDictionary for handler lookup.

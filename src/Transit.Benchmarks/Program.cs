@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Running;
 
-namespace Transit.Benchmarks;
+namespace Transit.Net.Benchmarks;
 
 public class Program
 {

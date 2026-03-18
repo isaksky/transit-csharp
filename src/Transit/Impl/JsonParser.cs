@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Text.Json;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// JSON parser using System.Text.Json Utf8JsonReader for streaming, zero-allocation parsing.

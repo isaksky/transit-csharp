@@ -12,7 +12,7 @@ void Main() {
 
     var samples = new List<object>();
 
-    Transit.Tests.Generators.AnyGen.Sample(x => {
+    Transit.Net.Tests.Generators.AnyGen.Sample(x => {
         samples.Add(x);
     }, iter: 15);
 

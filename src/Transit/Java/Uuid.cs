@@ -1,4 +1,4 @@
-namespace Transit.Java;
+namespace Transit.Net.Java;
 
 /// <summary>
 /// Wrapper providing Java-style UUID most/least significant bits access for Guid.

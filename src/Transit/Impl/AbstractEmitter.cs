@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Base class for transit emitters. Uses FrozenDictionary for handler lookup

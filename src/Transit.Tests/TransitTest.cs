@@ -3,10 +3,10 @@ using System.Numerics;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Transit;
-using Transit.Impl;
-using Transit.Numerics;
+using Transit.Net.Impl;
+using Transit.Net.Numerics;
 
-namespace Transit.Tests;
+namespace Transit.Net.Tests;
 
 [TestClass]
 public class TransitTest
@@ -107,7 +107,7 @@ public class TransitTest
     {
         var d = new DateTime(2014, 8, 9, 10, 6, 21, 497, DateTimeKind.Local);
         var expected = new DateTimeOffset(d).LocalDateTime;
-        long javaTime = Transit.Java.Convert.ToJavaTime(d);
+        long javaTime = Transit.Net.Java.Convert.ToJavaTime(d);
 
         string timeString = AbstractParser.FormatDateTime(d);
         Assert.AreEqual(expected, Reader("\"~t" + timeString + "\"").Read<DateTime>());
@@ -128,8 +128,8 @@ public class TransitTest
     public void TestReadGuid()
     {
         var guid = Guid.NewGuid();
-        long hi64 = ((Transit.Java.Uuid)guid).MostSignificantBits;
-        long lo64 = ((Transit.Java.Uuid)guid).LeastSignificantBits;
+        long hi64 = ((Transit.Net.Java.Uuid)guid).MostSignificantBits;
+        long lo64 = ((Transit.Net.Java.Uuid)guid).LeastSignificantBits;
 
         Assert.AreEqual(guid, Reader("\"~u" + guid.ToString() + "\"").Read<Guid>());
         Assert.AreEqual(guid, Reader("{\"~#u\": [" + hi64 + ", " + lo64 + "]}").Read<Guid>());
@@ -600,7 +600,7 @@ public class TransitTest
     {
         var d = DateTime.Now;
         string dateString = AbstractParser.FormatDateTime(d);
-        long dateLong = Transit.Java.Convert.ToJavaTime(d);
+        long dateLong = Transit.Net.Java.Convert.ToJavaTime(d);
         Assert.AreEqual(ScalarVerbose("\"~t" + dateString + "\""), WriteJsonVerbose(d));
         Assert.AreEqual(Scalar("\"~m" + dateLong + "\""), WriteJson(d));
     }
@@ -743,7 +743,7 @@ public class TransitTest
     [TestMethod]
     public void TestWriteCDictionaryWithNullKey()
     {
-        var d = new Transit.Impl.NullKeyDictionary();
+        var d = new Transit.Net.Impl.NullKeyDictionary();
         d[null] = "null as map key";
         d[new List<object> { "1", "2" }] = "Array as key to force cmap";
 
@@ -1260,7 +1260,7 @@ public class TransitTest
         Assert.AreEqual(3L, readList[2]);
 
         // Verify null in both key and value positions of maps
-        var dict = new Transit.Impl.NullKeyDictionary();
+        var dict = new Transit.Net.Impl.NullKeyDictionary();
         dict[null] = null;
         var encoded = WriteJson(dict);
         var readDict = Reader(encoded).Read<IDictionary>();
@@ -1288,8 +1288,8 @@ public class TransitTest
         Assert.AreEqual(3L, rList[2]);
 
         // 4. Verify null in both key and value positions of maps
-        // We use Transit.Impl.NullKeyDictionary since standard Dictionary throws on null key
-        var mapWithNull = new Transit.Impl.NullKeyDictionary();
+        // We use Transit.Net.Impl.NullKeyDictionary since standard Dictionary throws on null key
+        var mapWithNull = new Transit.Net.Impl.NullKeyDictionary();
         mapWithNull[null] = "null value";
         mapWithNull["null key"] = null;
 
@@ -1406,7 +1406,7 @@ public class TransitTest
         Assert.IsNull(readMapVal["a"]);
 
         // Null as map key
-        var mapKey = new Transit.Impl.NullKeyDictionary();
+        var mapKey = new Transit.Net.Impl.NullKeyDictionary();
         mapKey[null] = "value";
         string json = WriteJson(mapKey);
         // By spec, null key should encode as ~_
@@ -1652,8 +1652,8 @@ public class TransitTest
         Assert.IsTrue(WriteJsonVerbose(guid).Contains("~u" + guid.ToString()));
 
         // hi64/lo64 array form
-        long hi64 = ((Transit.Java.Uuid)guid).MostSignificantBits;
-        long lo64 = ((Transit.Java.Uuid)guid).LeastSignificantBits;
+        long hi64 = ((Transit.Net.Java.Uuid)guid).MostSignificantBits;
+        long lo64 = ((Transit.Net.Java.Uuid)guid).LeastSignificantBits;
         var readFromArray = Reader("{\"~#u\": [" + hi64 + ", " + lo64 + "]}").Read<Guid>();
         Assert.AreEqual(guid, readFromArray);
 

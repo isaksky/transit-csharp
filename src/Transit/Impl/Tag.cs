@@ -1,4 +1,4 @@
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Represents a tag used during parsing.

@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Provides transit encoding for a specific type.

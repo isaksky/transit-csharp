@@ -3,9 +3,9 @@ using System.IO;
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using OldTransitFactory = OldTransit::Beerendonk.Transit.TransitFactory;
-using NewTransitFactory = Transit.TransitFactory;
+using NewTransitFactory = Transit.Net.TransitFactory;
 
-namespace Transit.Benchmarks;
+namespace Transit.Net.Benchmarks;
 
 [Config(typeof(QuickConfig))]
 [MemoryDiagnoser]

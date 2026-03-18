@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using System.Text.Json;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// JSON verbose emitter — writes maps as JSON objects and tags as map entries.

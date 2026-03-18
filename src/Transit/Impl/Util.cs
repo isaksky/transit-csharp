@@ -1,4 +1,4 @@
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Utility methods for transit encoding.

@@ -1,4 +1,4 @@
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Default list builder for transit reading.

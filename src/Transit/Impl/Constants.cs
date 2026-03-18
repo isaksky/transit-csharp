@@ -1,4 +1,4 @@
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Transit protocol constants.

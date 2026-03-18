@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Decodes a transit-encoded value from its representation.

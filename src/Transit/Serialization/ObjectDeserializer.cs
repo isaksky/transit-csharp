@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Transit.Impl;
+using Transit.Net.Impl;
 
-namespace Transit.Serialization;
+namespace Transit.Net.Serialization;
 
 /// <summary>
 /// Provides high-performance deserialization for POCOs using compiled expression trees

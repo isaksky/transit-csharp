@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Sentinel type for null values in handler dispatch.

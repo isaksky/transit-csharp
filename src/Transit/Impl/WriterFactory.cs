@@ -3,11 +3,11 @@ using System.Collections;
 using System.Collections.Frozen;
 using System.Numerics;
 using System.Text.Json;
-using Transit.Impl.WriteHandlers;
-using Transit.Numerics;
-using Transit.Spi;
+using Transit.Net.Impl.WriteHandlers;
+using Transit.Net.Numerics;
+using Transit.Net.Spi;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Constructs transit writers. Handler dictionaries are built once as FrozenDictionary.

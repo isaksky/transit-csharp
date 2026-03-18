@@ -1,4 +1,4 @@
-namespace Transit.Java;
+namespace Transit.Net.Java;
 
 /// <summary>
 /// Conversion utilities between .NET DateTime and Java epoch milliseconds.

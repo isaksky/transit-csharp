@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// A dictionary that supports null keys, matching Java's HashMap behavior.

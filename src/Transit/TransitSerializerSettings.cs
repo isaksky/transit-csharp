@@ -1,4 +1,4 @@
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Specifies the settings to use with <see cref="TransitConvert"/>.

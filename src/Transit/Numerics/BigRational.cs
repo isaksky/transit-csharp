@@ -4,7 +4,7 @@
 using System.Globalization;
 using System.Numerics;
 
-namespace Transit.Numerics;
+namespace Transit.Net.Numerics;
 
 /// <summary>
 /// Represents an arbitrarily large signed rational number.

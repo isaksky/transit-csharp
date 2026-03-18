@@ -1,4 +1,4 @@
-namespace Transit.Impl;
+namespace Transit.Net.Impl;
 
 /// <summary>
 /// Interface for emitter-aware write handlers.

@@ -5,7 +5,7 @@ using System.Numerics;
 using CsCheck;
 using Transit;
 
-namespace Transit.Tests
+namespace Transit.Net.Tests
 {
     public static class Generators
     {

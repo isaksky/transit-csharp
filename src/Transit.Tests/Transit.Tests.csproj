@@ -5,15 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <BaseIntermediateOutputPath>/tmp/transit-tests-obj/</BaseIntermediateOutputPath>
-    <OutputPath>/tmp/transit-tests-bin/</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="3.2.2" />
     <PackageReference Include="MSTest.TestFramework" Version="3.2.2" />
-    <PackageReference Include="CsCheck" Version="4.1.2" />
+    <PackageReference Include="CsCheck" Version="4.2.0" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
   </ItemGroup>
 

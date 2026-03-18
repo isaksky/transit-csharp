@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Numerics;
-using Transit.Numerics;
+using Transit.Net.Numerics;
 
-namespace Transit.Impl.ReadHandlers;
+namespace Transit.Net.Impl.ReadHandlers;
 
 internal sealed class KeywordReadHandler : IReadHandler
 {
@@ -84,7 +84,7 @@ internal sealed class VerboseDateTimeReadHandler : IReadHandler
 internal sealed class DateTimeReadHandler : IReadHandler
 {
     public object FromRepresentation(object representation)
-        => Transit.Java.Convert.FromJavaTime(System.Convert.ToInt64(representation));
+        => Transit.Net.Java.Convert.FromJavaTime(System.Convert.ToInt64(representation));
 }
 
 internal sealed class UriReadHandler : IReadHandler
@@ -101,7 +101,7 @@ internal sealed class GuidReadHandler : IReadHandler
         {
             long msb = System.Convert.ToInt64(list[0]);
             long lsb = System.Convert.ToInt64(list[1]);
-            return Transit.Java.Uuid.ToGuid(msb, lsb);
+            return Transit.Net.Java.Uuid.ToGuid(msb, lsb);
         }
         return Guid.Parse((string)representation);
     }

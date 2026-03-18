@@ -5,7 +5,7 @@ using Transit;
 using CsCheck;
 using FluentAssertions;
 
-namespace Transit.Tests
+namespace Transit.Net.Tests
 {
     [TestClass]
     public class TransitPropertyTests

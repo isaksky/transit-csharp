@@ -1,7 +1,7 @@
 using System.Text;
-using Transit.Serialization;
+using Transit.Net.Serialization;
 
-namespace Transit;
+namespace Transit.Net;
 
 /// <summary>
 /// Provides methods for converting between .NET types and Transit format.

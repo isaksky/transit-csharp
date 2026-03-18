@@ -4,11 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Transit</RootNamespace>
-    <AssemblyName>Transit</AssemblyName>
+    <RootNamespace>Transit.Net</RootNamespace>
+    <AssemblyName>Transit.Net</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <BaseIntermediateOutputPath>/tmp/transit-new-obj/</BaseIntermediateOutputPath>
-    <OutputPath>/tmp/transit-new-bin/</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

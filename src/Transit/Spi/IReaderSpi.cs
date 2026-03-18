@@ -1,4 +1,4 @@
-namespace Transit.Spi;
+namespace Transit.Net.Spi;
 
 /// <summary>
 /// SPI interface for reader configuration.

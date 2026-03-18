@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Transit.Impl.WriteHandlers;
+namespace Transit.Net.Impl.WriteHandlers;
 
 internal sealed class NullWriteHandler : AbstractWriteHandler
 {
@@ -96,7 +96,7 @@ internal sealed class DateTimeWriteHandler : AbstractWriteHandler
     private static readonly IWriteHandler VerboseHandler = new VerboseDateTimeWriteHandler();
 
     public override string Tag(object obj) => "m";
-    public override object Representation(object obj) => Transit.Java.Convert.ToJavaTime((DateTime)obj);
+    public override object Representation(object obj) => Transit.Net.Java.Convert.ToJavaTime((DateTime)obj);
     public override string? StringRepresentation(object obj) => Convert.ToString(Representation(obj), CultureInfo.InvariantCulture);
     public override IWriteHandler? GetVerboseHandler() => VerboseHandler;
 }
